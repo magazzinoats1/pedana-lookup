@@ -1,0 +1,28 @@
+{
+  "summary": "Frontend-only verification of the new 'Filtri per Stato' chip row in Magazzino > Cerca Pedana at 390x844. Seeded 2 TEST orders (TEST99901: 2 pedane with 1 flipped to 'parziale'; TEST99902: 1 pedana flipped to 'completo') via POST /api/pedane + PATCH /api/pedane/{id}/stato using office token, giving a snapshot of 27 pedane {attesa:25, parziale:1, completo:1} - exercised every chip, then DELETE'd all 3 TEST pedane; DB restored to original 24 real pedane. All 6 requested feature flows PASS: (1) Chip row shows magazzino-filter-{tutte|attesa|parziale|completo} with counts 27/25/1/1 matching GET /api/pedane/tutte by statoArrivo; (2) Each chip filters the grouped list - selecting 'attesa' hides the completo-only TEST99902 group while keeping TEST99901 (which still has 1 attesa member) and magazzino-results-count updates to '25 pedane · 13 ordini'; magazzino-group-progress-TEST99901 stays 'Scaricate 0/2' reflecting the FULL order even while viewing only its attesa member; 'completo' filter shows TEST99902 with 'Scaricate 1/1'; (3) Combining completo filter + search '019' yields magazzino-filter-empty with magazzino-filter-reset-button that restores 'Tutte' (search text preserved → '22 pedane trovate · 11 ordini'); (4) Chip counts reflect current search results (with '019' typed, counts become 22/22/0/0); (5) Chips stay on a single horizontally-scrollable row (same y=204, height=36), the chipRow container height is 56 as spec'd, only color changes when selected (chip height stable); (6) Tapping a card inside a filtered group opens pedana-detail-card and magazzino-back-to-results-button returns to the filtered list with the active chip preserved. No React Native red screen, no new deprecation warnings, no horizontal overflow.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/test_reports/pytest/pytest_tutte.xml (pre-existing /api/pedane/tutte backend coverage)"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "magazzino.tsx L57: filtered = results.filter((p) => p.statoArrivo === filtro) is applied AFTER the fetch, so chip counts (L102) and filtered list derive from the same `results` snapshot - counts always match what the user can actually see. Correct.",
+    "L171-172: `all = results.filter(p => (p.numeroOrdine||'—') === g.numero)` and `done = all.filter(p => p.statoArrivo==='completo').length` recompute per-group over the UNFILTERED results, so progress 'Scaricate X/N' correctly reflects the FULL order even when the group is only showing a subset of its pedane under an active filter. Verified: TEST99901 shows 'Scaricate 0/2' while only 1 of 2 pedane is listed under the 'attesa' filter.",
+    "L149-154: filter-empty branch is gated by `!selected && filtered.length === 0`, so it only appears when there is NO auto-selected pedana - this prevents the magazzino-filter-empty state from flickering when a single-result search auto-opens detail. Good.",
+    "L245: chipRow height is fixed at 56 (ScrollView style) and chip height is 36 - selected state only mutates border/background colors (L112), not size, so no layout shift. Good.",
+    "L102: count calculation is O(results * 4 filters) per render - fine at current scale (<1000 pedane) and simpler than memoizing; no change needed."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "not tested this iteration", "frontend": "100% (6/6 feature flows pass)"},
+  "seed_data_creation": "Created 3 TEST pedane (2 orders TEST99901 & TEST99902) to populate parziale/completo buckets, then DELETE'd all 3 after testing. Verified DB post-cleanup = 24 real pedane, 0 TEST rows. No real records modified. Office password unchanged (antolini2024).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Public URL: EXPO_PUBLIC_BACKEND_URL=https://pedana-lookup.preview.emergentagent.com. Office pw: antolini2024. Current real snapshot: 24 pedane / 12 ordini, all statoArrivo='attesa', so without seeding only the 'tutte' and 'attesa' chips carry a non-zero count. To test parziale/completo chips, create TEST-prefixed pedane via POST /api/pedane {form:{numeroOrdine,agenzia,mittente,dataConsegna,note}, pedane:[{codice,destinazione,numeroColli,mittente,merce}]} then PATCH /api/pedane/{id}/stato {stato:'parziale'|'completo', noteParziale?} with Bearer from POST /api/auth/login {password}. Always DELETE afterwards. Filter chip testIDs: magazzino-filter-{tutte|attesa|parziale|completo} with inner magazzino-filter-count-{key}. Empty-filter state: magazzino-filter-empty + magazzino-filter-reset-button. Result cards are magazzino-result-{pedana.id} (now globally unique, previous 'codice' collision issue is resolved).",
+  "rca_of_issue": "N/A - new feature works end-to-end; no bugs found."
+}

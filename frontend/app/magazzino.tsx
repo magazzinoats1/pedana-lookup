@@ -19,6 +19,7 @@ export default function Magazzino() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [coop, setCoop] = useState("");
+  const [filtro, setFiltro] = useState<Filtro>("tutte");
   const reqId = useRef(0);
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -53,6 +54,7 @@ export default function Magazzino() {
     return () => clearTimeout(t);
   }, [q]);
 
+  const filtered = filtro === "tutte" ? results : results.filter((p) => p.statoArrivo === filtro);
   const selected = q.trim() && results.length === 1 ? results[0] : results.find((r) => r.id === selectedId) ?? null;
   const onUpdated = (p: Pedana) => setResults((rs) => rs.map((r) => (r.id === p.id ? p : r)));
 
@@ -88,6 +90,34 @@ export default function Magazzino() {
           )}
         </View>
       </View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.chipRow}
+        contentContainerStyle={styles.chipRowContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        {FILTRI.map((f) => {
+          const active = filtro === f.key;
+          const n = f.key === "tutte" ? results.length : results.filter((p) => p.statoArrivo === f.key).length;
+          const tone = f.key === "tutte" ? colors.brandPrimary : statoColor(f.key, colors);
+          return (
+            <Pressable
+              key={f.key}
+              testID={`magazzino-filter-${f.key}`}
+              onPress={() => {
+                setFiltro(f.key);
+                setSelectedId(null);
+              }}
+              style={[styles.chip, { borderColor: active ? tone : colors.borderStrong, backgroundColor: active ? tone : colors.surfaceSecondary }]}
+            >
+              {f.key !== "tutte" && <View style={[styles.chipDot, { backgroundColor: active ? colors.onBrand : tone }]} />}
+              <Text style={[styles.chipText, { color: active ? colors.onBrand : colors.onSurfaceSecondary }]}>{f.label}</Text>
+              <Text style={[styles.chipCount, { color: active ? colors.onBrand : colors.muted }]} testID={`magazzino-filter-count-${f.key}`}>{n}</Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
 
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
@@ -116,6 +146,12 @@ export default function Magazzino() {
             <Text style={styles.emptyTitle}>Nessuna pedana trovata</Text>
             <Text style={styles.emptySub}>Controlla il codice e riprova</Text>
           </View>
+        ) : !selected && filtered.length === 0 ? (
+          <View style={styles.empty} testID="magazzino-filter-empty">
+            <MaterialDesignIcons name="filter-off-outline" size={64} color={colors.borderStrong} />
+            <Text style={styles.emptyTitle}>Nessuna pedana {FILTRI.find((f) => f.key === filtro)?.label.toLowerCase()}</Text>
+            <Button label="Mostra tutte" icon="filter-remove-outline" variant="ghost" onPress={() => setFiltro("tutte")} testID="magazzino-filter-reset-button" />
+          </View>
         ) : selected ? (
           <View style={styles.gap}>
             {results.length > 1 && (
@@ -129,10 +165,11 @@ export default function Magazzino() {
         ) : (
           <View style={styles.gap}>
             <Text style={styles.count} testID="magazzino-results-count">
-              {q.trim() ? `${results.length} pedane trovate` : `Tutta la merce registrata · ${results.length} pedane`} · {groupByOrder(results).length} ordini
+              {q.trim() ? `${filtered.length} pedane trovate` : filtro === "tutte" ? `Tutta la merce registrata · ${filtered.length} pedane` : `${filtered.length} pedane`} · {groupByOrder(filtered).length} ordini
             </Text>
-            {groupByOrder(results).map((g, gi) => {
-              const done = g.items.filter((p) => p.statoArrivo === "completo").length;
+            {groupByOrder(filtered).map((g, gi) => {
+              const all = results.filter((p) => (p.numeroOrdine || "—") === g.numero);
+              const done = all.filter((p) => p.statoArrivo === "completo").length;
               const colli = g.items.reduce((n, p) => n + (parseInt(p.numeroColli, 10) || 0), 0);
               return (
                 <Animated.View key={g.numero} entering={FadeInDown.delay(Math.min(gi, 6) * 50).duration(220)} style={styles.group} testID={`magazzino-group-${g.numero}`}>
@@ -151,9 +188,9 @@ export default function Magazzino() {
                   </View>
                   <View style={styles.progressRow}>
                     <View style={styles.progressTrack}>
-                      <View style={[styles.progressFill, { width: `${(done / g.items.length) * 100}%` }]} />
+                      <View style={[styles.progressFill, { width: `${(done / all.length) * 100}%` }]} />
                     </View>
-                    <Text style={styles.progressText} testID={`magazzino-group-progress-${g.numero}`}>Scaricate {done}/{g.items.length}</Text>
+                    <Text style={styles.progressText} testID={`magazzino-group-progress-${g.numero}`}>Scaricate {done}/{all.length}</Text>
                   </View>
                   <View style={styles.groupItems}>
                     {g.items.map((p) => (
@@ -186,6 +223,14 @@ export default function Magazzino() {
   );
 }
 
+type Filtro = "tutte" | "attesa" | "parziale" | "completo";
+const FILTRI: { key: Filtro; label: string }[] = [
+  { key: "tutte", label: "Tutte" },
+  { key: "attesa", label: "In attesa" },
+  { key: "parziale", label: "Parziali" },
+  { key: "completo", label: "Scaricate" },
+];
+
 function groupByOrder(list: Pedana[]) {
   const map = new Map<string, Pedana[]>();
   for (const p of list) {
@@ -197,6 +242,12 @@ function groupByOrder(list: Pedana[]) {
 }
 
 const useStyles = makeStyles((c) => ({
+  chipRow: { flexGrow: 0, height: 56, backgroundColor: c.surfaceSecondary, borderBottomWidth: 1, borderBottomColor: c.border },
+  chipRowContent: { gap: 8, paddingHorizontal: 16, alignItems: "center" },
+  chip: { height: 36, flexShrink: 0, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1.5 },
+  chipDot: { width: 8, height: 8, borderRadius: 4 },
+  chipText: { fontFamily: fonts.textSemi, fontSize: 14 },
+  chipCount: { fontFamily: fonts.textBold, fontSize: 13 },
   group: { backgroundColor: c.surfaceSecondary, borderRadius: 14, borderWidth: 1, borderColor: c.border, overflow: "hidden", marginBottom: 6 },
   groupHead: { backgroundColor: c.brandPrimary, flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14, paddingVertical: 10 },
   groupLabel: { fontFamily: fonts.textBold, fontSize: 10, letterSpacing: 1.2, color: c.brandSoftText },
@@ -211,7 +262,7 @@ const useStyles = makeStyles((c) => ({
   groupItems: { padding: 10, gap: 8 },
   root: { flex: 1, backgroundColor: c.surface },
   flex: { flex: 1 },
-  searchCard: { backgroundColor: c.surfaceSecondary, padding: 16, borderBottomWidth: 1, borderBottomColor: c.border },
+  searchCard: { backgroundColor: c.surfaceSecondary, padding: 16, paddingBottom: 4 },
   h1: { fontFamily: fonts.display, fontSize: 28, color: c.brandPrimary },
   hint: { fontFamily: fonts.text, fontSize: 13, color: c.muted, marginBottom: 12 },
   bold: { fontFamily: fonts.textBold, color: c.onSurfaceSecondary },

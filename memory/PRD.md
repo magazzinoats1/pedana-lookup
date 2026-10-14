@@ -19,6 +19,7 @@ User uploaded a KÖLLA transport-order PDF and a reference web app (GestioneLogi
 - Same posizione allowed on multiple pedane (no blocking); new per-pedana field 'Tipo merce' (form, list, magazzino results/detail, search, PDF import)
 - Magazzino 'Cerca Pedana' shows the full list of all registered pedane/merce when the search is empty (GET /api/pedane/tutte, pull-to-refresh)
 - Magazzino list (full list and search results) grouped by numero ordine: truck header with date, pedane count, total colli, progress 'Scaricate X/N'
+- Magazzino status filter chips (Tutte / In attesa / Parziali / Scaricate) with live counts, combined with search; group progress always reflects the full order
 - Security audit run: SEC-001 default office password (change it), SEC-002 wildcard CORS, hardening: login rate limit, PDF size cap
 
 ## Backlog
