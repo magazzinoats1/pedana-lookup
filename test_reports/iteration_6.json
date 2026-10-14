@@ -1,0 +1,31 @@
+{
+  "summary": "Both backend & frontend tested at 390x844 for the two new Magazzino features: (A) Oggi/Domani date filter chips alongside existing status chips; (B) 'Scarica ordine intero' bulk-complete flow via public POST /api/ordini/scarica. Backend: 8/8 pytest cases pass (/app/backend/tests/test_scarica_ordine.py). Verified happy path (aggiornate==N), idempotent re-call (aggiornate==0 and arrivoCompletoAt UNCHANGED on already-completo pedane), unknown order (aggiornate:0, 200 OK), empty numeroOrdine (422), and mixed-status order (only non-completo flipped). Frontend: seeded 2 TEST orders (TEST9FOGGI: 2 pedane dataConsegna=today, TEST9FDOM: 1 pedana dataConsegna=tomorrow) via office POST /api/pedane. Verified all 4 required feature flows: (1) chip row shows magazzino-date-filter-{tutte|oggi|domani} with counts (tutte=27, oggi=9, domani=13) + divider + magazzino-filter-{tutte|attesa|parziale|completo} on a single horizontal line; (2) selecting Oggi filters groups to today-only (TEST9FOGGI visible, TEST9FDOM hidden) AND status counts drop to the date-filtered set (status-tutte=9, status-attesa=9); Domani symmetrically shows only tomorrow groups; (3) combining date=Oggi + status=completo yields magazzino-filter-empty + magazzino-filter-reset-button which successfully restores both filters to 'tutte' (status-tutte back to 27); (4) each not-fully-complete group shows magazzino-scarica-ordine-button-{numero} labelled 'Scarica ordine intero (N)' with the right remaining count (2); tapping it opens magazzino-scarica-sheet, magazzino-scarica-cancel-button closes it without touching progress (still 'Scaricate 0/2'), magazzino-scarica-confirm-button flips all N pedane to completo, shows toast 'Ordine TEST9FOGGI: 2 pedane scaricate', progress becomes 'Scaricate 2/2' and the button is replaced by magazzino-ordine-completo-{numero} badge. All 3 TEST pedane cleaned up via DELETE /api/pedane/{id} (200). No real records touched. No React Native red screen. One minor pre-existing deprecation warning in console (props.pointerEvents) comes from Reanimated/Sheet and is unrelated to this iteration.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "Sheet/Reanimated (console)", "issue": "Console warning: 'props.pointerEvents is deprecated. Use style.pointerEvents' - comes from one of react-native-reanimated/Sheet dependencies; not caused by magazzino.tsx. No functional impact. Reference: observed in /app/frontend/src/components/Sheet.tsx stack."}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_scarica_ordine.py",
+    "/app/test_reports/pytest/pytest_scarica.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py L314-320: /ordini/scarica is correctly PUBLIC (no Depends(require_ufficio)) which matches the spec for warehouse staff. Mongo update filter {statoArrivo: {$ne:'completo'}} guarantees already-completo rows keep their original arrivoCompletoAt timestamp - verified end-to-end.",
+    "magazzino.tsx L64: date filter uses local client date via isoDay(0|1); if the device clock is wrong or in a different timezone than the server-stored dataConsegna strings (which are plain YYYY-MM-DD, no TZ), 'Oggi' may misalign at midnight edges. Acceptable for a logistics app, worth noting.",
+    "magazzino.tsx L227: `all = results.filter(p => (p.numeroOrdine||'—') === g.numero)` evaluates against UNFILTERED results so progress and 'Scarica ordine intero (N)' always reflect the FULL order even when a date/status filter is active - correct.",
+    "magazzino.tsx L139 vs L126: date chip counts use `results` directly (not search-filtered?) - actually results IS the search result set (api returns matches of q), so the counts correctly reflect the current search; verified.",
+    "magazzino.tsx L75 `await search(q)` after scarica correctly re-fetches so the group transitions from button → completo badge even when the server only flipped some pedane."
+  ],
+  "updated_files": ["/app/backend/tests/test_scarica_ordine.py (new)"],
+  "success_rate": {"backend": "100% (8/8)", "frontend": "100% (4/4 feature flows)"},
+  "seed_data_creation": "Created 3 TEST pedane across 2 orders (TEST9FOGGI dataConsegna=today 2 pedane, TEST9FDOM dataConsegna=tomorrow 1 pedana) via office POST /api/pedane. Backend pytest additionally created 4 TEST pedane across 3 orders (today/tomorrow/yesterday) via module-scoped fixture with teardown. All test data DELETEd afterwards; verified cleanup (3× HTTP 200). DB restored to original real snapshot (24 pedane / 12 ordini). Office password unchanged.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Public URL: https://pedana-lookup.preview.emergentagent.com. Office pw: antolini2024. Both new features (date filter chips + scarica ordine intero) fully working end-to-end. Reusable backend test: /app/backend/tests/test_scarica_ordine.py (seeds today/tomorrow/past orders, covers scarica happy/idempotent/unknown/empty/partial paths, auto-cleans). Frontend testIDs for the new chips: magazzino-date-filter-{tutte|oggi|domani} + magazzino-date-filter-count-{key}; divider is a plain View with no testID. Scarica flow testIDs: magazzino-scarica-ordine-button-{numero} → magazzino-scarica-sheet → magazzino-scarica-{cancel|confirm}-button → magazzino-ordine-completo-{numero} replaces button, magazzino-group-progress-{numero} updates to 'Scaricate N/N'. Date filter uses local client timezone via isoDay() helper so tests must seed dataConsegna with the client's local YYYY-MM-DD. Pre-existing minor console warning (props.pointerEvents) from Sheet/Reanimated, no impact.",
+  "rca_of_issue": "N/A - both new features work as specified; no bugs found."
+}

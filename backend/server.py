@@ -125,6 +125,10 @@ class StatoReq(BaseModel):
     noteParziale: str = ""
 
 
+class ScaricaOrdineReq(BaseModel):
+    numeroOrdine: str = Field(min_length=1)
+
+
 class LoginReq(BaseModel):
     password: str = Field(min_length=1, max_length=256)
 
@@ -305,6 +309,15 @@ async def update_stato(pid: str, body: StatoReq):
         patch = {"statoArrivo": "attesa", "arrivoParzialeAt": None, "arrivoCompletoAt": None, "noteParziale": ""}
     res = await db.pedane.find_one_and_update({"id": pid}, {"$set": patch}, return_document=True)
     return Pedana.from_mongo(res)
+
+
+@api.post("/ordini/scarica")
+async def scarica_ordine(body: ScaricaOrdineReq):
+    res = await db.pedane.update_many(
+        {"numeroOrdine": body.numeroOrdine.strip(), "statoArrivo": {"$ne": "completo"}},
+        {"$set": {"statoArrivo": "completo", "arrivoCompletoAt": now_iso()}},
+    )
+    return {"aggiornate": res.modified_count}
 
 
 @api.delete("/pedane/{pid}")

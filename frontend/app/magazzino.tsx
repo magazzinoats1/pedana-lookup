@@ -3,11 +3,14 @@ import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, TextInp
 import { useRouter } from "expo-router";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as Haptics from "expo-haptics";
 import { MaterialDesignIcons } from "@react-native-vector-icons/material-design-icons";
 
 import { api, formatDate, Pedana } from "@/src/api";
 import { AppHeader } from "@/src/components/AppHeader";
 import { PedanaDetail, statoColor } from "@/src/components/PedanaDetail";
+import { Sheet } from "@/src/components/Sheet";
+import { useToast } from "@/src/components/Toast";
 import { Button, IconButton } from "@/src/components/ui";
 import { fonts, makeStyles, useTheme } from "@/src/theme";
 
@@ -20,6 +23,10 @@ export default function Magazzino() {
   const [error, setError] = useState("");
   const [coop, setCoop] = useState("");
   const [filtro, setFiltro] = useState<Filtro>("tutte");
+  const [dataFiltro, setDataFiltro] = useState<DataFiltro>("tutte");
+  const [scaricaOrdine, setScaricaOrdine] = useState<{ numero: string; mancanti: number } | null>(null);
+  const [scaricando, setScaricando] = useState(false);
+  const toast = useToast();
   const reqId = useRef(0);
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -54,7 +61,24 @@ export default function Magazzino() {
     return () => clearTimeout(t);
   }, [q]);
 
-  const filtered = filtro === "tutte" ? results : results.filter((p) => p.statoArrivo === filtro);
+  const dateFiltered = dataFiltro === "tutte" ? results : results.filter((p) => p.dataConsegna === isoDay(dataFiltro === "oggi" ? 0 : 1));
+  const filtered = filtro === "tutte" ? dateFiltered : dateFiltered.filter((p) => p.statoArrivo === filtro);
+
+  async function confermaScarica() {
+    if (!scaricaOrdine) return;
+    setScaricando(true);
+    try {
+      const r = await api<{ aggiornate: number }>("/ordini/scarica", { method: "POST", body: { numeroOrdine: scaricaOrdine.numero } });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      toast(`Ordine ${scaricaOrdine.numero}: ${r.aggiornate} pedane scaricate`);
+      setScaricaOrdine(null);
+      await search(q);
+    } catch (e: any) {
+      toast(e.message, "error");
+    } finally {
+      setScaricando(false);
+    }
+  }
   const selected = q.trim() && results.length === 1 ? results[0] : results.find((r) => r.id === selectedId) ?? null;
   const onUpdated = (p: Pedana) => setResults((rs) => rs.map((r) => (r.id === p.id ? p : r)));
 
@@ -97,9 +121,29 @@ export default function Magazzino() {
         contentContainerStyle={styles.chipRowContent}
         keyboardShouldPersistTaps="handled"
       >
+        {DATE_FILTRI.map((f) => {
+          const active = dataFiltro === f.key;
+          const n = f.key === "tutte" ? results.length : results.filter((p) => p.dataConsegna === isoDay(f.key === "oggi" ? 0 : 1)).length;
+          return (
+            <Pressable
+              key={f.key}
+              testID={`magazzino-date-filter-${f.key}`}
+              onPress={() => {
+                setDataFiltro(f.key);
+                setSelectedId(null);
+              }}
+              style={[styles.chip, { borderColor: active ? colors.brandSecondary : colors.borderStrong, backgroundColor: active ? colors.brandSecondary : colors.surfaceSecondary }]}
+            >
+              <MaterialDesignIcons name={f.icon as any} size={16} color={active ? colors.onBrandSecondary : colors.muted} />
+              <Text style={[styles.chipText, { color: active ? colors.onBrandSecondary : colors.onSurfaceSecondary }]}>{f.label}</Text>
+              <Text style={[styles.chipCount, { color: active ? colors.onBrandSecondary : colors.muted }]} testID={`magazzino-date-filter-count-${f.key}`}>{n}</Text>
+            </Pressable>
+          );
+        })}
+        <View style={styles.chipDivider} />
         {FILTRI.map((f) => {
           const active = filtro === f.key;
-          const n = f.key === "tutte" ? results.length : results.filter((p) => p.statoArrivo === f.key).length;
+          const n = f.key === "tutte" ? dateFiltered.length : dateFiltered.filter((p) => p.statoArrivo === f.key).length;
           const tone = f.key === "tutte" ? colors.brandPrimary : statoColor(f.key, colors);
           return (
             <Pressable
@@ -149,8 +193,20 @@ export default function Magazzino() {
         ) : !selected && filtered.length === 0 ? (
           <View style={styles.empty} testID="magazzino-filter-empty">
             <MaterialDesignIcons name="filter-off-outline" size={64} color={colors.borderStrong} />
-            <Text style={styles.emptyTitle}>Nessuna pedana {FILTRI.find((f) => f.key === filtro)?.label.toLowerCase()}</Text>
-            <Button label="Mostra tutte" icon="filter-remove-outline" variant="ghost" onPress={() => setFiltro("tutte")} testID="magazzino-filter-reset-button" />
+            <Text style={styles.emptyTitle}>
+              Nessuna pedana{filtro !== "tutte" ? ` ${FILTRI.find((f) => f.key === filtro)?.label.toLowerCase()}` : ""}
+              {dataFiltro !== "tutte" ? ` per ${dataFiltro}` : ""}
+            </Text>
+            <Button
+              label="Mostra tutte"
+              icon="filter-remove-outline"
+              variant="ghost"
+              onPress={() => {
+                setFiltro("tutte");
+                setDataFiltro("tutte");
+              }}
+              testID="magazzino-filter-reset-button"
+            />
           </View>
         ) : selected ? (
           <View style={styles.gap}>
@@ -165,7 +221,7 @@ export default function Magazzino() {
         ) : (
           <View style={styles.gap}>
             <Text style={styles.count} testID="magazzino-results-count">
-              {q.trim() ? `${filtered.length} pedane trovate` : filtro === "tutte" ? `Tutta la merce registrata · ${filtered.length} pedane` : `${filtered.length} pedane`} · {groupByOrder(filtered).length} ordini
+              {q.trim() ? `${filtered.length} pedane trovate` : filtro === "tutte" && dataFiltro === "tutte" ? `Tutta la merce registrata · ${filtered.length} pedane` : `${filtered.length} pedane`} · {groupByOrder(filtered).length} ordini
             </Text>
             {groupByOrder(filtered).map((g, gi) => {
               const all = results.filter((p) => (p.numeroOrdine || "—") === g.numero);
@@ -192,6 +248,21 @@ export default function Magazzino() {
                     </View>
                     <Text style={styles.progressText} testID={`magazzino-group-progress-${g.numero}`}>Scaricate {done}/{all.length}</Text>
                   </View>
+                  {done < all.length ? (
+                    <Pressable
+                      testID={`magazzino-scarica-ordine-button-${g.numero}`}
+                      onPress={() => setScaricaOrdine({ numero: g.numero, mancanti: all.length - done })}
+                      style={({ pressed }) => [styles.scaricaBtn, pressed && { opacity: 0.85 }]}
+                    >
+                      <MaterialDesignIcons name="check-all" size={22} color={colors.onSuccess} />
+                      <Text style={styles.scaricaText}>Scarica ordine intero ({all.length - done})</Text>
+                    </Pressable>
+                  ) : (
+                    <View style={styles.scaricatoBox} testID={`magazzino-ordine-completo-${g.numero}`}>
+                      <MaterialDesignIcons name="check-circle" size={20} color={colors.success} />
+                      <Text style={styles.scaricatoText}>Ordine scaricato</Text>
+                    </View>
+                  )}
                   <View style={styles.groupItems}>
                     {g.items.map((p) => (
                       <Pressable
@@ -219,8 +290,35 @@ export default function Magazzino() {
           </View>
         )}
       </ScrollView>
+
+      <Sheet visible={!!scaricaOrdine} onClose={() => setScaricaOrdine(null)} testID="magazzino-scarica-sheet">
+        <View style={styles.sheetHead}>
+          <MaterialDesignIcons name="truck-check-outline" size={44} color={colors.success} />
+          <Text style={styles.sheetTitle}>Scaricare tutto l&apos;ordine {scaricaOrdine?.numero}?</Text>
+          <Text style={styles.sheetSub}>
+            {scaricaOrdine?.mancanti} pedan{scaricaOrdine?.mancanti === 1 ? "a verrà segnata" : "e verranno segnate"} come scaricat{scaricaOrdine?.mancanti === 1 ? "a" : "e"} (completo).
+          </Text>
+        </View>
+        <View style={styles.sheetBtns}>
+          <Button label="Sì, scarica tutto" variant="success" icon="check-all" loading={scaricando} onPress={confermaScarica} testID="magazzino-scarica-confirm-button" />
+          <Button label="Annulla" variant="secondary" onPress={() => setScaricaOrdine(null)} testID="magazzino-scarica-cancel-button" />
+        </View>
+      </Sheet>
     </View>
   );
+}
+
+type DataFiltro = "tutte" | "oggi" | "domani";
+const DATE_FILTRI: { key: DataFiltro; label: string; icon: string }[] = [
+  { key: "tutte", label: "Tutte le date", icon: "calendar-blank-outline" },
+  { key: "oggi", label: "Oggi", icon: "calendar-today" },
+  { key: "domani", label: "Domani", icon: "calendar-arrow-right" },
+];
+
+function isoDay(offset: number) {
+  const d = new Date();
+  d.setDate(d.getDate() + offset);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 type Filtro = "tutte" | "attesa" | "parziale" | "completo";
@@ -245,6 +343,15 @@ const useStyles = makeStyles((c) => ({
   chipRow: { flexGrow: 0, height: 56, backgroundColor: c.surfaceSecondary, borderBottomWidth: 1, borderBottomColor: c.border },
   chipRowContent: { gap: 8, paddingHorizontal: 16, alignItems: "center" },
   chip: { height: 36, flexShrink: 0, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1.5 },
+  chipDivider: { width: 1, height: 28, backgroundColor: c.borderStrong, marginHorizontal: 4 },
+  scaricaBtn: { minHeight: 52, marginHorizontal: 10, marginTop: 10, borderRadius: 12, backgroundColor: c.success, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
+  scaricaText: { fontFamily: fonts.textBold, fontSize: 15, color: c.onSuccess },
+  scaricatoBox: { flexDirection: "row", alignItems: "center", gap: 6, marginHorizontal: 10, marginTop: 10, padding: 10, borderRadius: 10, backgroundColor: c.successTint },
+  scaricatoText: { fontFamily: fonts.textBold, fontSize: 14, color: c.onSuccessTint },
+  sheetHead: { alignItems: "center", gap: 6, marginBottom: 16 },
+  sheetTitle: { fontFamily: fonts.textBold, fontSize: 19, color: c.onSurface, textAlign: "center" },
+  sheetSub: { fontFamily: fonts.text, fontSize: 14, color: c.onSurfaceTertiary, textAlign: "center" },
+  sheetBtns: { gap: 10 },
   chipDot: { width: 8, height: 8, borderRadius: 4 },
   chipText: { fontFamily: fonts.textSemi, fontSize: 14 },
   chipCount: { fontFamily: fonts.textBold, fontSize: 13 },
