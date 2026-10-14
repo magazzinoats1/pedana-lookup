@@ -86,6 +86,8 @@ class Pedana(BaseDocument):
     arrivoParzialeAt: Optional[str] = None
     arrivoCompletoAt: Optional[str] = None
     noteParziale: str = ""
+    arrivoParzialeDa: str = ""
+    arrivoCompletoDa: str = ""
 
 
 class OrdineForm(BaseModel):
@@ -123,10 +125,19 @@ class DupReq(BaseModel):
 class StatoReq(BaseModel):
     stato: Literal["attesa", "parziale", "completo"]
     noteParziale: str = ""
+    operatore: str = Field(min_length=1, max_length=60)
 
 
 class ScaricaOrdineReq(BaseModel):
     numeroOrdine: str = Field(min_length=1)
+    operatore: str = Field(min_length=1, max_length=60)
+
+
+def nome_operatore(raw: str) -> str:
+    nome = raw.strip()
+    if not nome:
+        raise HTTPException(status_code=400, detail="Inserisci il nome del magazziniere")
+    return nome
 
 
 class LoginReq(BaseModel):
@@ -298,24 +309,27 @@ async def update_pedana(pid: str, body: UpdateReq, _=Depends(require_ufficio)):
 
 @api.patch("/pedane/{pid}/stato", response_model=Pedana)
 async def update_stato(pid: str, body: StatoReq):
+    operatore = nome_operatore(body.operatore)
     doc = await db.pedane.find_one({"id": pid})
     if not doc:
         raise HTTPException(status_code=404, detail="Pedana non trovata")
     if body.stato == "completo":
-        patch = {"statoArrivo": "completo", "arrivoCompletoAt": now_iso()}
+        patch = {"statoArrivo": "completo", "arrivoCompletoAt": now_iso(), "arrivoCompletoDa": operatore}
     elif body.stato == "parziale":
-        patch = {"statoArrivo": "parziale", "arrivoParzialeAt": now_iso(), "noteParziale": body.noteParziale.strip()}
+        patch = {"statoArrivo": "parziale", "arrivoParzialeAt": now_iso(), "noteParziale": body.noteParziale.strip(), "arrivoParzialeDa": operatore}
     else:
-        patch = {"statoArrivo": "attesa", "arrivoParzialeAt": None, "arrivoCompletoAt": None, "noteParziale": ""}
+        patch = {"statoArrivo": "attesa", "arrivoParzialeAt": None, "arrivoCompletoAt": None, "noteParziale": "",
+                 "arrivoParzialeDa": "", "arrivoCompletoDa": ""}
     res = await db.pedane.find_one_and_update({"id": pid}, {"$set": patch}, return_document=True)
     return Pedana.from_mongo(res)
 
 
 @api.post("/ordini/scarica")
 async def scarica_ordine(body: ScaricaOrdineReq):
+    operatore = nome_operatore(body.operatore)
     res = await db.pedane.update_many(
         {"numeroOrdine": body.numeroOrdine.strip(), "statoArrivo": {"$ne": "completo"}},
-        {"$set": {"statoArrivo": "completo", "arrivoCompletoAt": now_iso()}},
+        {"$set": {"statoArrivo": "completo", "arrivoCompletoAt": now_iso(), "arrivoCompletoDa": operatore}},
     )
     return {"aggiornate": res.modified_count}
 

@@ -1,0 +1,30 @@
+{
+  "summary": "Both backend & frontend tested at 390x844 for the new 'Nome Magazziniere' feature: anyone can view the Magazzino list; segnare scaricato/parziale/annulla or 'Scarica ordine intero' is possible ONLY after entering a magazziniere name. Backend: 9/9 pytest cases pass (/app/backend/tests/test_operatore.py). PATCH /api/pedane/{id}/stato correctly requires body.operatore (missing -> 422, blank -> 400 'Inserisci il nome del magazziniere'); stato=completo persists arrivoCompletoDa, stato=parziale persists arrivoParzialeDa, stato=attesa clears BOTH (also clears At timestamps). POST /api/ordini/scarica same validation and stamps arrivoCompletoDa on every flipped pedana. GET /api/pedane/tutte exposes arrivoCompletoDa and arrivoParzialeDa fields. Frontend: seeded 2 TEST pedane via office API and exercised the full UX: (1) without name header pill shows 'Inserisci nome' + magazzino-readonly-hint visible; (2) list/detail viewable; (3) in pedana detail stato-segna-completo-button NOT rendered; stato-readonly + stato-richiedi-nome-button are; (4) tapping richiedi-nome opens magazzino-nome-sheet with magazzino-nome-input; (5) typing 1 char + save shows 'Inserisci il tuo nome' validation; (6) saving 'Mario Rossi' updates header pill, hides readonly hint, reveals stato buttons; (7) name persists after page reload; (8) segna completo then stato-completo-by shows '... · da Mario Rossi'; (9) tapping magazzino-nome-remove-button restores read-only; (10) tapping magazzino-scarica-ordine-button-{num} WITHOUT a name opens magazzino-nome-sheet first (scarica-sheet NOT yet visible); after saving 'Luca Bianchi' the pending scarica sheet auto-opens and shows 'Operatore: Luca Bianchi'; (11) confirming persists arrivoCompletoDa='Luca Bianchi' on all flipped pedane (verified via /pedane/tutte). All TEST data cleaned up. No React Native red screen. No new issues found.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_operatore.py",
+    "/app/test_reports/pytest/pytest_operatore.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py L128,133: StatoReq.operatore and ScaricaOrdineReq.operatore use Field(min_length=1) so missing/empty-string triggers 422 at pydantic layer; whitespace-only is caught by nome_operatore() helper (400). Clean split, good error UX.",
+    "server.py L321-322: when resetting to 'attesa' both arrivoParzialeDa and arrivoCompletoDa are cleared along with the At timestamps - verified via test. Note: nome_operatore() is still called for stato=attesa so the client must provide SOME name even to reset. That matches the spec ('solo se metti il nome ... allora si può mettere scaricato oppure no') and the frontend never calls update() unless operatore is set.",
+    "StatoToggle.tsx L38-54: nice conditional render — without operatore it ONLY renders the stato-readonly block + stato-richiedi-nome-button and never the segna-* buttons. Prevents any possibility of a nameless mutation from the UI.",
+    "magazzino.tsx L54-57: pendingScarica.current pattern correctly re-opens the Scarica sheet right after name save, so the user doesn't have to tap the button twice. Also correctly cleared on sheet dismiss (L357-358).",
+    "magazzino.tsx L107: scarica POST body sends `operatore` from state (null-safe because the button handler forces name-entry before opening the sheet). If the sheet were somehow opened without a name, the API would 422 and surface the toast — defensive.",
+    "ufficio/index.tsx L128,132: 'da {nome}' is rendered next to each parziale/completo log line. Data persists correctly (verified via API after frontend scarica)."
+  ],
+  "updated_files": ["/app/backend/tests/test_operatore.py (new)"],
+  "success_rate": {"backend": "100% (9/9)", "frontend": "100% (all 5 feature flows end-to-end)"},
+  "seed_data_creation": "Backend pytest fixture seeds 5 TEST pedane across 2 orders (3 for stato tests + 2 for scarica test); all DELETEd on teardown. Frontend playwright test seeds 2 TEST pedane in 1 order (TEST_NM_<stamp>) via office POST /api/pedane and DELETEs them in the finally block. No real records touched; DB restored. Office password unchanged.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Public URL: https://pedana-lookup.preview.emergentagent.com. Office pw: antolini2024. Nome Magazziniere feature fully working. New reusable backend test: /app/backend/tests/test_operatore.py (9 tests, self-cleaning). Key testIDs: magazzino-operatore-button, magazzino-operatore-nome, magazzino-readonly-hint, magazzino-nome-sheet, magazzino-nome-input, magazzino-nome-save-button, magazzino-nome-remove-button, stato-readonly, stato-richiedi-nome-button, stato-segna-completo-button, stato-segna-parziale-button, stato-completo-by, stato-parziale-by, magazzino-scarica-ordine-button-{numero}, magazzino-scarica-sheet, magazzino-scarica-confirm-button. Operatore name is stored in localStorage via storage util (OPERATORE_KEY from src/api). Pending-scarica pattern: when user taps scarica button without name, apriNome() runs and pendingScarica.current remembers the request so after name save the scarica sheet auto-opens. In playwright, use document.querySelector(...).click() via page.evaluate() when a modal button is rendered just below the 844px viewport (Sheet component doesn't scroll on web preview). Backend 422 vs 400: 422 is pydantic (missing field / min_length=1 fail on empty string), 400 is nome_operatore() helper for whitespace-only. ",
+  "rca_of_issue": "N/A — feature works as specified; no bugs found."
+}

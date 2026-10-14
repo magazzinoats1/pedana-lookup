@@ -125,10 +125,11 @@ export default function Ufficio() {
           {!!o.arrivoParzialeAt && (
             <Text style={[styles.log, { color: colors.onWarningTint }]}>
               Parziale: {formatDateTime(o.arrivoParzialeAt)}
+              {o.arrivoParzialeDa ? ` · da ${o.arrivoParzialeDa}` : ""}
               {o.noteParziale ? ` — ${o.noteParziale}` : ""}
             </Text>
           )}
-          {!!o.arrivoCompletoAt && <Text style={[styles.log, { color: colors.success }]}>Completo: {formatDateTime(o.arrivoCompletoAt)}</Text>}
+          {!!o.arrivoCompletoAt && <Text style={[styles.log, { color: colors.success }]}>Completo: {formatDateTime(o.arrivoCompletoAt)}{o.arrivoCompletoDa ? ` · da ${o.arrivoCompletoDa}` : ""}</Text>}
         </View>
       </Animated.View>
     );

@@ -8,7 +8,9 @@ import { useToast } from "@/src/components/Toast";
 import { Button } from "@/src/components/ui";
 import { fonts, makeStyles, useTheme } from "@/src/theme";
 
-export function StatoToggle({ pedana, onUpdated }: { pedana: Pedana; onUpdated: (p: Pedana) => void }) {
+type Props = { pedana: Pedana; onUpdated: (p: Pedana) => void; operatore: string | null; onRequestName: () => void };
+
+export function StatoToggle({ pedana, onUpdated, operatore, onRequestName }: Props) {
   const [showParziale, setShowParziale] = useState(false);
   const [note, setNote] = useState(pedana.noteParziale || "");
   const [busy, setBusy] = useState(false);
@@ -20,7 +22,7 @@ export function StatoToggle({ pedana, onUpdated }: { pedana: Pedana; onUpdated: 
   async function update(s: Stato, noteParziale = "") {
     setBusy(true);
     try {
-      const p = await api<Pedana>(`/pedane/${pedana.id}/stato`, { method: "PATCH", body: { stato: s, noteParziale } });
+      const p = await api<Pedana>(`/pedane/${pedana.id}/stato`, { method: "PATCH", body: { stato: s, noteParziale, operatore } });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       onUpdated(p);
       setShowParziale(false);
@@ -32,6 +34,24 @@ export function StatoToggle({ pedana, onUpdated }: { pedana: Pedana; onUpdated: 
       setBusy(false);
     }
   }
+
+  if (!operatore)
+    return (
+      <View style={styles.col} testID="stato-readonly">
+        {stato === "attesa" ? (
+          <View style={[styles.statusBox, { backgroundColor: colors.brandTertiary, borderColor: colors.brandSecondary }]} testID="stato-badge-attesa">
+            <MaterialDesignIcons name="clock-outline" size={30} color={colors.brandSecondary} />
+            <Text style={[styles.statusTitle, { color: colors.onBrandTertiary }]}>In attesa di scarico</Text>
+          </View>
+        ) : (
+          <StatusInfo pedana={pedana} />
+        )}
+        <Pressable onPress={onRequestName} style={({ pressed }) => [styles.lockBtn, pressed && { opacity: 0.8 }]} testID="stato-richiedi-nome-button">
+          <MaterialDesignIcons name="account-lock-outline" size={22} color={colors.onWarningTint} />
+          <Text style={styles.lockText}>Inserisci il tuo nome per segnare lo scarico</Text>
+        </Pressable>
+      </View>
+    );
 
   if (showParziale)
     return (
@@ -84,14 +104,7 @@ export function StatoToggle({ pedana, onUpdated }: { pedana: Pedana; onUpdated: 
   if (stato === "parziale")
     return (
       <View style={styles.col}>
-        <View style={[styles.statusBox, { backgroundColor: colors.warningTint, borderColor: colors.warning }]} testID="stato-badge-parziale">
-          <MaterialDesignIcons name="circle-half-full" size={30} color={colors.warning} />
-          <View style={styles.flex}>
-            <Text style={[styles.statusTitle, { color: colors.onWarningTint }]}>Arrivo Parziale</Text>
-            {!!pedana.arrivoParzialeAt && <Text style={[styles.statusSub, { color: colors.onWarningTint }]}>{formatDateTime(pedana.arrivoParzialeAt)}</Text>}
-            {!!pedana.noteParziale && <Text style={[styles.statusNote, { color: colors.onWarningTint }]}>{pedana.noteParziale}</Text>}
-          </View>
-        </View>
+        <StatusInfo pedana={pedana} />
         <View style={styles.row}>
           <Button label="Segna Completo" variant="success" icon="check-all" loading={busy} onPress={() => update("completo")} testID="stato-completa-button" style={styles.flex} />
           <Button label="Annulla" variant="danger" icon="close" onPress={() => update("attesa")} testID="stato-annulla-button" />
@@ -101,20 +114,51 @@ export function StatoToggle({ pedana, onUpdated }: { pedana: Pedana; onUpdated: 
 
   return (
     <View style={styles.col}>
-      <View style={[styles.statusBox, { backgroundColor: colors.successTint, borderColor: colors.success }]} testID="stato-badge-completo">
-        <MaterialDesignIcons name="check-circle" size={30} color={colors.success} />
+      <StatusInfo pedana={pedana} />
+      <Button label="Annulla stato" variant="danger" icon="close" loading={busy} onPress={() => update("attesa")} testID="stato-annulla-button" />
+    </View>
+  );
+}
+
+function StatusInfo({ pedana }: { pedana: Pedana }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
+  const da = (n?: string) => (n ? ` · da ${n}` : "");
+  if (pedana.statoArrivo === "parziale")
+    return (
+      <View style={[styles.statusBox, { backgroundColor: colors.warningTint, borderColor: colors.warning }]} testID="stato-badge-parziale">
+        <MaterialDesignIcons name="circle-half-full" size={30} color={colors.warning} />
         <View style={styles.flex}>
-          <Text style={[styles.statusTitle, { color: colors.onSuccessTint }]}>Scaricato — Completo</Text>
-          {!!pedana.arrivoCompletoAt && <Text style={[styles.statusSub, { color: colors.onSuccessTint }]}>{formatDateTime(pedana.arrivoCompletoAt)}</Text>}
+          <Text style={[styles.statusTitle, { color: colors.onWarningTint }]}>Arrivo Parziale</Text>
           {!!pedana.arrivoParzialeAt && (
-            <Text style={[styles.statusNote, { color: colors.onWarningTint }]}>
-              Parziale: {formatDateTime(pedana.arrivoParzialeAt)}
-              {pedana.noteParziale ? ` — ${pedana.noteParziale}` : ""}
+            <Text style={[styles.statusSub, { color: colors.onWarningTint }]} testID="stato-parziale-by">
+              {formatDateTime(pedana.arrivoParzialeAt)}
+              {da(pedana.arrivoParzialeDa)}
             </Text>
           )}
+          {!!pedana.noteParziale && <Text style={[styles.statusNote, { color: colors.onWarningTint }]}>{pedana.noteParziale}</Text>}
         </View>
       </View>
-      <Button label="Annulla stato" variant="danger" icon="close" loading={busy} onPress={() => update("attesa")} testID="stato-annulla-button" />
+    );
+  return (
+    <View style={[styles.statusBox, { backgroundColor: colors.successTint, borderColor: colors.success }]} testID="stato-badge-completo">
+      <MaterialDesignIcons name="check-circle" size={30} color={colors.success} />
+      <View style={styles.flex}>
+        <Text style={[styles.statusTitle, { color: colors.onSuccessTint }]}>Scaricato — Completo</Text>
+        {!!pedana.arrivoCompletoAt && (
+          <Text style={[styles.statusSub, { color: colors.onSuccessTint }]} testID="stato-completo-by">
+            {formatDateTime(pedana.arrivoCompletoAt)}
+            {da(pedana.arrivoCompletoDa)}
+          </Text>
+        )}
+        {!!pedana.arrivoParzialeAt && (
+          <Text style={[styles.statusNote, { color: colors.onWarningTint }]}>
+            Parziale: {formatDateTime(pedana.arrivoParzialeAt)}
+            {da(pedana.arrivoParzialeDa)}
+            {pedana.noteParziale ? ` — ${pedana.noteParziale}` : ""}
+          </Text>
+        )}
+      </View>
     </View>
   );
 }
@@ -149,6 +193,8 @@ const useStyles = makeStyles((c) => ({
   statusTitle: { fontFamily: fonts.textBold, fontSize: 17 },
   statusSub: { fontFamily: fonts.textMedium, fontSize: 13 },
   statusNote: { fontFamily: fonts.text, fontSize: 13, marginTop: 4 },
+  lockBtn: { minHeight: 56, borderRadius: 12, borderWidth: 2, borderStyle: "dashed", borderColor: c.warning, backgroundColor: c.warningTint, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingHorizontal: 12 },
+  lockText: { fontFamily: fonts.textBold, fontSize: 14, color: c.onWarningTint, flexShrink: 1 },
   parzBox: { backgroundColor: c.warningTint, borderColor: c.warning, borderWidth: 2, borderRadius: 12, padding: 14, gap: 10 },
   parzTitle: { fontFamily: fonts.textBold, fontSize: 16, color: c.onWarningTint },
   parzInput: {

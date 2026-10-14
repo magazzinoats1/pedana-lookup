@@ -6,12 +6,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { MaterialDesignIcons } from "@react-native-vector-icons/material-design-icons";
 
-import { api, formatDate, Pedana } from "@/src/api";
+import { api, formatDate, OPERATORE_KEY, Pedana } from "@/src/api";
+import { storage } from "@/src/utils/storage";
 import { AppHeader } from "@/src/components/AppHeader";
 import { PedanaDetail, statoColor } from "@/src/components/PedanaDetail";
 import { Sheet } from "@/src/components/Sheet";
 import { useToast } from "@/src/components/Toast";
-import { Button, IconButton } from "@/src/components/ui";
+import { Button, Field, IconButton } from "@/src/components/ui";
 import { fonts, makeStyles, useTheme } from "@/src/theme";
 
 export default function Magazzino() {
@@ -27,6 +28,41 @@ export default function Magazzino() {
   const [scaricaOrdine, setScaricaOrdine] = useState<{ numero: string; mancanti: number } | null>(null);
   const [scaricando, setScaricando] = useState(false);
   const toast = useToast();
+  const [operatore, setOperatore] = useState<string | null>(null);
+  const [showNome, setShowNome] = useState(false);
+  const [nomeInput, setNomeInput] = useState("");
+  const [nomeErr, setNomeErr] = useState("");
+  const pendingScarica = useRef<{ numero: string; mancanti: number } | null>(null);
+
+  useEffect(() => {
+    storage.getItem<string | null>(OPERATORE_KEY, null).then((n) => setOperatore(n || null));
+  }, []);
+
+  function apriNome() {
+    setNomeInput(operatore ?? "");
+    setNomeErr("");
+    setShowNome(true);
+  }
+
+  async function salvaNome() {
+    const n = nomeInput.trim();
+    if (n.length < 2) return setNomeErr("Inserisci il tuo nome");
+    await storage.setItem(OPERATORE_KEY, n);
+    setOperatore(n);
+    setShowNome(false);
+    toast(`Ciao ${n}, ora puoi segnare gli scarichi`);
+    if (pendingScarica.current) {
+      setScaricaOrdine(pendingScarica.current);
+      pendingScarica.current = null;
+    }
+  }
+
+  async function rimuoviNome() {
+    await storage.removeItem(OPERATORE_KEY);
+    setOperatore(null);
+    setShowNome(false);
+    toast("Nome rimosso: solo consultazione");
+  }
   const reqId = useRef(0);
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -68,7 +104,7 @@ export default function Magazzino() {
     if (!scaricaOrdine) return;
     setScaricando(true);
     try {
-      const r = await api<{ aggiornate: number }>("/ordini/scarica", { method: "POST", body: { numeroOrdine: scaricaOrdine.numero } });
+      const r = await api<{ aggiornate: number }>("/ordini/scarica", { method: "POST", body: { numeroOrdine: scaricaOrdine.numero, operatore } });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       toast(`Ordine ${scaricaOrdine.numero}: ${r.aggiornate} pedane scaricate`);
       setScaricaOrdine(null);
@@ -89,7 +125,24 @@ export default function Magazzino() {
         right={<IconButton icon="logout" tone="onBrand" onPress={() => router.replace("/")} testID="magazzino-esci-button" />}
       />
       <View style={styles.searchCard}>
-        <Text style={styles.h1}>Cerca Pedana</Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.h1}>Cerca Pedana</Text>
+          <Pressable
+            onPress={apriNome}
+            testID="magazzino-operatore-button"
+            style={({ pressed }) => [styles.opPill, !operatore && styles.opPillWarn, pressed && { opacity: 0.8 }]}
+          >
+            <MaterialDesignIcons name={operatore ? "account-hard-hat" : "account-alert-outline"} size={18} color={operatore ? colors.onBrandTertiary : colors.onWarningTint} />
+            <Text style={[styles.opText, !operatore && { color: colors.onWarningTint }]} numberOfLines={1} testID="magazzino-operatore-nome">
+              {operatore ?? "Inserisci nome"}
+            </Text>
+          </Pressable>
+        </View>
+        {!operatore && (
+          <Text style={styles.readonlyHint} testID="magazzino-readonly-hint">
+            Solo consultazione: inserisci il tuo nome per segnare gli scarichi
+          </Text>
+        )}
         <Text style={styles.hint}>
           Posizione pedana <Text style={styles.bold}>(scarico)</Text> o numero ordine <Text style={styles.bold}>(carico)</Text>
         </Text>
@@ -216,7 +269,7 @@ export default function Magazzino() {
                 <Text style={styles.backText}>{q.trim() ? `Torna ai ${results.length} risultati` : "Torna alla lista merce"}</Text>
               </Pressable>
             )}
-            <PedanaDetail key={selected.id} pedana={selected} onUpdated={onUpdated} />
+            <PedanaDetail key={selected.id} pedana={selected} onUpdated={onUpdated} operatore={operatore} onRequestName={apriNome} />
           </View>
         ) : (
           <View style={styles.gap}>
@@ -251,7 +304,14 @@ export default function Magazzino() {
                   {done < all.length ? (
                     <Pressable
                       testID={`magazzino-scarica-ordine-button-${g.numero}`}
-                      onPress={() => setScaricaOrdine({ numero: g.numero, mancanti: all.length - done })}
+                      onPress={() => {
+                        const req = { numero: g.numero, mancanti: all.length - done };
+                        if (operatore) setScaricaOrdine(req);
+                        else {
+                          pendingScarica.current = req;
+                          apriNome();
+                        }
+                      }}
                       style={({ pressed }) => [styles.scaricaBtn, pressed && { opacity: 0.85 }]}
                     >
                       <MaterialDesignIcons name="check-all" size={22} color={colors.onSuccess} />
@@ -291,11 +351,46 @@ export default function Magazzino() {
         )}
       </ScrollView>
 
+      <Sheet
+        visible={showNome}
+        onClose={() => {
+          pendingScarica.current = null;
+          setShowNome(false);
+        }}
+        testID="magazzino-nome-sheet"
+      >
+        <View style={styles.sheetHead}>
+          <MaterialDesignIcons name="account-hard-hat" size={44} color={colors.brandPrimary} />
+          <Text style={styles.sheetTitle}>Nome magazziniere</Text>
+          <Text style={styles.sheetSub}>Il tuo nome verrà registrato su ogni scarico che segni</Text>
+        </View>
+        <Field
+          label="Nome e cognome"
+          value={nomeInput}
+          onChangeText={(t) => {
+            setNomeInput(t);
+            setNomeErr("");
+          }}
+          placeholder="es. Mario Rossi"
+          autoFocus
+          autoCapitalize="words"
+          returnKeyType="done"
+          onSubmitEditing={salvaNome}
+          error={nomeErr}
+          testID="magazzino-nome-input"
+        />
+        <View style={styles.sheetBtns}>
+          <Button label="Salva nome" icon="check" onPress={salvaNome} testID="magazzino-nome-save-button" />
+          {!!operatore && <Button label="Rimuovi nome (solo consultazione)" variant="danger" icon="account-remove-outline" onPress={rimuoviNome} testID="magazzino-nome-remove-button" />}
+        </View>
+      </Sheet>
+
       <Sheet visible={!!scaricaOrdine} onClose={() => setScaricaOrdine(null)} testID="magazzino-scarica-sheet">
         <View style={styles.sheetHead}>
           <MaterialDesignIcons name="truck-check-outline" size={44} color={colors.success} />
           <Text style={styles.sheetTitle}>Scaricare tutto l&apos;ordine {scaricaOrdine?.numero}?</Text>
           <Text style={styles.sheetSub}>
+            Operatore: {operatore} ·{" "}
             {scaricaOrdine?.mancanti} pedan{scaricaOrdine?.mancanti === 1 ? "a verrà segnata" : "e verranno segnate"} come scaricat{scaricaOrdine?.mancanti === 1 ? "a" : "e"} (completo).
           </Text>
         </View>
@@ -343,6 +438,11 @@ const useStyles = makeStyles((c) => ({
   chipRow: { flexGrow: 0, height: 56, backgroundColor: c.surfaceSecondary, borderBottomWidth: 1, borderBottomColor: c.border },
   chipRowContent: { gap: 8, paddingHorizontal: 16, alignItems: "center" },
   chip: { height: 36, flexShrink: 0, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1.5 },
+  titleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 },
+  opPill: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 40, maxWidth: 180, paddingHorizontal: 12, borderRadius: 999, backgroundColor: c.brandTertiary },
+  opPillWarn: { backgroundColor: c.warningTint, borderWidth: 1.5, borderColor: c.warning },
+  opText: { fontFamily: fonts.textBold, fontSize: 14, color: c.onBrandTertiary, flexShrink: 1 },
+  readonlyHint: { fontFamily: fonts.textSemi, fontSize: 12, color: c.onWarningTint, marginBottom: 4 },
   chipDivider: { width: 1, height: 28, backgroundColor: c.borderStrong, marginHorizontal: 4 },
   scaricaBtn: { minHeight: 52, marginHorizontal: 10, marginTop: 10, borderRadius: 12, backgroundColor: c.success, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
   scaricaText: { fontFamily: fonts.textBold, fontSize: 15, color: c.onSuccess },

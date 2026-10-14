@@ -2,6 +2,7 @@ import { storage } from "@/src/utils/storage";
 
 const BASE = `${process.env.EXPO_PUBLIC_BACKEND_URL}/api`;
 export const TOKEN_KEY = "ufficio_session_token";
+export const OPERATORE_KEY = "magazziniere_nome";
 
 export type Stato = "attesa" | "parziale" | "completo";
 
@@ -22,6 +23,8 @@ export type Pedana = {
   arrivoParzialeAt: string | null;
   arrivoCompletoAt: string | null;
   noteParziale: string;
+  arrivoParzialeDa?: string;
+  arrivoCompletoDa?: string;
 };
 
 export type OrdineForm = {

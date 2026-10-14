@@ -22,6 +22,7 @@ User uploaded a KÖLLA transport-order PDF and a reference web app (GestioneLogi
 - Magazzino status filter chips (Tutte / In attesa / Parziali / Scaricate) with live counts, combined with search; group progress always reflects the full order
 - Magazzino date chips (Tutte le date / Oggi / Domani) combined with status chips and search
 - 'Scarica ordine intero' button per order group with confirm sheet (POST /api/ordini/scarica, public)
+- Nome magazziniere: list viewable by anyone; marking stato / scarica ordine only after entering worker name (saved on device); name recorded (arrivoCompletoDa / arrivoParzialeDa) and shown in Magazzino detail and Ufficio list
 - Security audit run: SEC-001 default office password (change it), SEC-002 wildcard CORS, hardening: login rate limit, PDF size cap
 
 ## Backlog

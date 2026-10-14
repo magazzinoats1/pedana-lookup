@@ -12,7 +12,17 @@ export function statoColor(stato: string, colors: ReturnType<typeof useTheme>["c
   return stato === "completo" ? colors.success : stato === "parziale" ? colors.warning : colors.brandSecondary;
 }
 
-export function PedanaDetail({ pedana, onUpdated }: { pedana: Pedana; onUpdated: (p: Pedana) => void }) {
+export function PedanaDetail({
+  pedana,
+  onUpdated,
+  operatore,
+  onRequestName,
+}: {
+  pedana: Pedana;
+  onUpdated: (p: Pedana) => void;
+  operatore: string | null;
+  onRequestName: () => void;
+}) {
   const { colors } = useTheme();
   const styles = useStyles();
   return (
@@ -41,7 +51,7 @@ export function PedanaDetail({ pedana, onUpdated }: { pedana: Pedana; onUpdated:
       )}
 
       <View style={styles.section}>
-        <StatoToggle pedana={pedana} onUpdated={onUpdated} />
+        <StatoToggle pedana={pedana} onUpdated={onUpdated} operatore={operatore} onRequestName={onRequestName} />
       </View>
 
       <View style={styles.grid}>
