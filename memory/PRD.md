@@ -15,6 +15,7 @@ User uploaded a KÖLLA transport-order PDF and a reference web app (GestioneLogi
 - AI PDF import tested on sample (6 pedane, order 25023467)
 - Start screen changed to white background (user request)
 - Drag & drop PDF import on web (drop anywhere on Nuovo Ordine screen); AI prompt tightened so mittente is company name only
+- Mittente moved from order data to each pedana row (required). PDF import now uses the short position code printed below (e.g. 2619-019320) and the supplier name on the right (ORCHIDEA, BERTOLI FRUIT, MORANDO GRAZIANO); rows with the same position are merged and their colli summed
 
 ## Backlog
 - P1: Barcode/label scan for positions (camera)

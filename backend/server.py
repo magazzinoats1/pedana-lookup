@@ -90,7 +90,7 @@ class Pedana(BaseDocument):
 class OrdineForm(BaseModel):
     numeroOrdine: str
     agenzia: str = ""
-    mittente: str
+    mittente: str = ""
     dataConsegna: str
     note: str = ""
 
@@ -313,14 +313,13 @@ Rispondi SOLO con JSON valido, senza testo extra, con questa struttura esatta:
 {
   "numeroOrdine": "numero dell'ordine di trasporto (es. 25023467)",
   "agenzia": "azienda che ha emesso/commissionato l'ordine (es. KÖLLA GmbH & Co. KG)",
-  "mittente": "SOLO il nome dell'azienda fornitrice/luogo di carico principale, senza indirizzo (se più di uno, il primo)",
   "dataConsegna": "data di scarico/consegna in formato YYYY-MM-DD",
   "note": "istruzioni importanti brevi (temperatura, avvisi), max 200 caratteri",
   "pedane": [
-    {"codice": "codice posizione completo (es. 2619-019320-10000)", "destinazione": "nome destinatario + città (luogo di scarico)", "numeroColli": "numero colli come intero senza decimali", "mittente": "SOLO il nome dell'azienda fornitrice di questa posizione, senza indirizzo"}
+    {"codice": "codice posizione CORTO stampato SOTTO il codice lungo, nel formato NNNN-NNNNNN (es. 2619-019320, 2619-019318, 2619-019321). NON usare il codice lungo sopra (es. 2619-019320-10000 o A2619-023221-10000)", "destinazione": "nome destinatario + città (luogo di scarico)", "numeroColli": "numero colli (valore K0/KO) come intero senza decimali", "mittente": "nome stampato A DESTRA della riga, in cima alla colonna tipologia merce (es. ORCHIDEA, BERTOLI FRUIT, MORANDO GRAZIANO). Scrivilo in maiuscole come nel documento, senza descrizione merce"}
   ]
 }
-Includi OGNI riga/posizione presente nel documento. Se un dato manca usa stringa vuota."""
+Includi OGNI riga presente nella sezione Luogo di carico (non ripetere le righe della sezione Luogo di scarico). Se un dato manca usa stringa vuota."""
 
 
 def extract_json(text: str) -> dict:
@@ -357,15 +356,24 @@ async def import_pdf(file: UploadFile = File(...), _=Depends(require_ufficio)):
         raise HTTPException(status_code=502, detail=f"Lettura PDF non riuscita: {str(e)[:120]}")
     finally:
         os.unlink(path)
-    pedane = []
+    # Merge rows sharing the same short position code (sum colli)
+    merged: dict = {}
     for p in parsed.get("pedane", []) or []:
-        colli = str(p.get("numeroColli", "") or "").replace(",00", "").replace(".00", "").strip()
-        pedane.append({
-            "codice": str(p.get("codice", "") or "").strip(),
+        codice = str(p.get("codice", "") or "").strip()
+        colli = re.sub(r"[.,]0+$", "", str(p.get("numeroColli", "") or "").strip())
+        key = codice.lower()
+        if key in merged and codice:
+            prev = merged[key]
+            if prev["numeroColli"].isdigit() and colli.isdigit():
+                prev["numeroColli"] = str(int(prev["numeroColli"]) + int(colli))
+            continue
+        merged[key or str(uuid.uuid4())] = {
+            "codice": codice,
             "destinazione": str(p.get("destinazione", "") or "").strip(),
             "numeroColli": colli,
             "mittente": str(p.get("mittente", "") or "").strip(),
-        })
+        }
+    pedane = list(merged.values())
     return {
         "numeroOrdine": str(parsed.get("numeroOrdine", "") or "").strip(),
         "agenzia": str(parsed.get("agenzia", "") or "").strip(),

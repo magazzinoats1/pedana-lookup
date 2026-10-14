@@ -13,14 +13,13 @@ import { useToast } from "@/src/components/Toast";
 import { Button, Field, IconButton } from "@/src/components/ui";
 import { fonts, makeStyles, useTheme } from "@/src/theme";
 
-const emptyForm = { numeroOrdine: "", agenzia: "", mittente: "", note: "" };
+const emptyForm = { numeroOrdine: "", agenzia: "", note: "" };
 const emptyRow: PedanaRow = { codice: "", destinazione: "", numeroColli: "", mittente: "" };
 
 type Errors = {
   numeroOrdine?: string;
-  mittente?: string;
   data?: string;
-  rows?: Record<number, { codice?: string; destinazione?: string }>;
+  rows?: Record<number, { codice?: string; destinazione?: string; mittente?: string }>;
   internalDup?: number[];
 };
 type DupResult = { codiceMatches: { codice: string; match: Pedana }[]; numeroMatches: Pedana[] };
@@ -67,9 +66,9 @@ export default function OrdineFormScreen() {
     if (!editingId) return;
     api<Pedana>(`/pedane/${editingId}`)
       .then((o) => {
-        setForm({ numeroOrdine: o.numeroOrdine, agenzia: o.agenzia, mittente: o.mittente, note: o.note });
+        setForm({ numeroOrdine: o.numeroOrdine, agenzia: o.agenzia, note: o.note });
         setData(isoToIt(o.dataConsegna));
-        setRows([{ codice: o.codice, destinazione: o.destinazione, numeroColli: o.numeroColli, mittente: "" }]);
+        setRows([{ codice: o.codice, destinazione: o.destinazione, numeroColli: o.numeroColli, mittente: o.mittente }]);
       })
       .catch((e) => toast(e.message, "error"))
       .finally(() => setLoading(false));
@@ -144,11 +143,11 @@ export default function OrdineFormScreen() {
     setImportInfo("");
     try {
       const r = await api<ImportResult>("/import-pdf", { method: "POST", form: fd });
-      setForm({ numeroOrdine: r.numeroOrdine, agenzia: r.agenzia, mittente: r.mittente, note: r.note });
+      setForm({ numeroOrdine: r.numeroOrdine, agenzia: r.agenzia, note: r.note });
       setData(isoToIt(r.dataConsegna));
       setRows(
         r.pedane.length
-          ? r.pedane.map((p) => ({ ...p, mittente: p.mittente && p.mittente !== r.mittente ? p.mittente : "" }))
+          ? r.pedane
           : [{ ...emptyRow }],
       );
       setErrors({});
@@ -164,7 +163,6 @@ export default function OrdineFormScreen() {
   function validate(): { e: Errors; iso: string | null } {
     const e: Errors = {};
     if (!form.numeroOrdine.trim()) e.numeroOrdine = "Obbligatorio";
-    if (!form.mittente.trim()) e.mittente = "Obbligatorio";
     const iso = itToIso(data);
     if (!data.trim()) e.data = "Obbligatorio";
     else if (!iso) e.data = "Formato GG/MM/AAAA";
@@ -172,8 +170,9 @@ export default function OrdineFormScreen() {
     const seen = new Map<string, number>();
     const internal = new Set<number>();
     rows.forEach((r, i) => {
-      const re: { codice?: string; destinazione?: string } = {};
+      const re: { codice?: string; destinazione?: string; mittente?: string } = {};
       if (!r.codice.trim()) re.codice = "Obbligatorio";
+      if (!r.mittente.trim()) re.mittente = "Obbligatorio";
       if (!r.destinazione.trim()) re.destinazione = "Obbligatorio";
       const n = r.codice.trim().toLowerCase();
       if (n) {
@@ -191,7 +190,7 @@ export default function OrdineFormScreen() {
 
   async function doSave() {
     const iso = itToIso(data)!;
-    const payloadForm: OrdineForm = { ...form, dataConsegna: iso };
+    const payloadForm: OrdineForm = { ...form, mittente: "", dataConsegna: iso };
     setSaving(true);
     try {
       if (editingId) {
@@ -289,7 +288,6 @@ export default function OrdineFormScreen() {
             <Field label="NUMERO ORDINE *" highlight value={form.numeroOrdine} onChangeText={setF("numeroOrdine")} placeholder="es. 25023467" error={errors.numeroOrdine} testID="form-numero-ordine-input" autoCapitalize="characters" />
           </View>
           <Field label="Agenzia" value={form.agenzia} onChangeText={setF("agenzia")} placeholder="Chi ha ordinato" testID="form-agenzia-input" />
-          <Field label="Mittente *" value={form.mittente} onChangeText={setF("mittente")} placeholder="Chi spedisce" error={errors.mittente} testID="form-mittente-input" />
           <Field
             label="Data consegna *"
             value={data}
@@ -331,20 +329,20 @@ export default function OrdineFormScreen() {
                   label="Posizione *"
                   value={r.codice}
                   onChangeText={(t) => setRow(i, "codice", t)}
-                  placeholder="es. 2619-019320-10000"
+                  placeholder="es. 2619-019320"
                   error={re?.codice ?? (isDup ? "Posizione duplicata in questo modulo" : undefined)}
                   testID={`form-pedana-codice-input-${i}`}
                   autoCapitalize="characters"
                   autoCorrect={false}
                   style={styles.codeInput}
                 />
-                <Field label="Destinazione *" value={r.destinazione} onChangeText={(t) => setRow(i, "destinazione", t)} placeholder="Cliente / reparto / zona" error={re?.destinazione} testID={`form-pedana-destinazione-input-${i}`} />
+                <Field label="Mittente *" value={r.mittente} onChangeText={(t) => setRow(i, "mittente", t)} placeholder="es. Orchidea, Bertoli Fruit…" error={re?.mittente} testID={`form-pedana-mittente-input-${i}`} />
                 <View style={styles.twoCol}>
+                  <View style={styles.flex2}>
+                    <Field label="Destinazione *" value={r.destinazione} onChangeText={(t) => setRow(i, "destinazione", t)} placeholder="Cliente / reparto / zona" error={re?.destinazione} testID={`form-pedana-destinazione-input-${i}`} />
+                  </View>
                   <View style={styles.flex}>
                     <Field label="N° Colli" value={r.numeroColli} onChangeText={(t) => setRow(i, "numeroColli", t.replace(/[^0-9]/g, ""))} placeholder="es. 84" keyboardType="number-pad" testID={`form-pedana-colli-input-${i}`} />
-                  </View>
-                  <View style={styles.flex2}>
-                    <Field label="Mittente (se diverso)" value={r.mittente} onChangeText={(t) => setRow(i, "mittente", t)} placeholder="Facoltativo" testID={`form-pedana-mittente-input-${i}`} />
                   </View>
                 </View>
               </Animated.View>
