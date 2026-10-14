@@ -129,28 +129,56 @@ export default function Magazzino() {
         ) : (
           <View style={styles.gap}>
             <Text style={styles.count} testID="magazzino-results-count">
-              {q.trim() ? `${results.length} pedane trovate` : `Tutta la merce registrata · ${results.length} pedane`}
+              {q.trim() ? `${results.length} pedane trovate` : `Tutta la merce registrata · ${results.length} pedane`} · {groupByOrder(results).length} ordini
             </Text>
-            {results.map((p, i) => (
-              <Animated.View key={p.id} entering={FadeInDown.delay(i * 40).duration(220)}>
-                <Pressable
-                  testID={`magazzino-result-${p.codice}`}
-                  onPress={() => setSelectedId(p.id)}
-                  style={({ pressed }) => [styles.resCard, { borderLeftColor: statoColor(p.statoArrivo, colors) }, pressed && { opacity: 0.8 }]}
-                >
-                  <View style={styles.flex}>
-                    <Text style={styles.resCode}>{p.codice}</Text>
-                    <Text style={styles.resDest} numberOfLines={1}>{p.destinazione}</Text>
-                    {!!p.merce && <Text style={styles.resMerce} numberOfLines={1}>{p.merce}</Text>}
-                    <Text style={styles.resMeta} numberOfLines={1}>
-                      Ord. {p.numeroOrdine} · {p.mittente}
-                      {p.numeroColli ? ` · ${p.numeroColli} colli` : ""} · {formatDate(p.dataConsegna)}
-                    </Text>
+            {groupByOrder(results).map((g, gi) => {
+              const done = g.items.filter((p) => p.statoArrivo === "completo").length;
+              const colli = g.items.reduce((n, p) => n + (parseInt(p.numeroColli, 10) || 0), 0);
+              return (
+                <Animated.View key={g.numero} entering={FadeInDown.delay(Math.min(gi, 6) * 50).duration(220)} style={styles.group} testID={`magazzino-group-${g.numero}`}>
+                  <View style={styles.groupHead}>
+                    <MaterialDesignIcons name="truck-outline" size={26} color={colors.onBrandPrimary} />
+                    <View style={styles.flex}>
+                      <Text style={styles.groupLabel}>ORDINE</Text>
+                      <Text style={styles.groupNum} testID={`magazzino-group-numero-${g.numero}`}>{g.numero}</Text>
+                    </View>
+                    <View style={styles.groupRight}>
+                      <Text style={styles.groupDate}>{formatDate(g.items[0].dataConsegna)}</Text>
+                      <Text style={styles.groupMeta} testID={`magazzino-group-summary-${g.numero}`}>
+                        {g.items.length} pedan{g.items.length === 1 ? "a" : "e"}{colli ? ` · ${colli} colli` : ""}
+                      </Text>
+                    </View>
                   </View>
-                  <MaterialDesignIcons name="chevron-right" size={30} color={colors.muted} />
-                </Pressable>
-              </Animated.View>
-            ))}
+                  <View style={styles.progressRow}>
+                    <View style={styles.progressTrack}>
+                      <View style={[styles.progressFill, { width: `${(done / g.items.length) * 100}%` }]} />
+                    </View>
+                    <Text style={styles.progressText} testID={`magazzino-group-progress-${g.numero}`}>Scaricate {done}/{g.items.length}</Text>
+                  </View>
+                  <View style={styles.groupItems}>
+                    {g.items.map((p) => (
+                      <Pressable
+                        key={p.id}
+                        testID={`magazzino-result-${p.id}`}
+                        onPress={() => setSelectedId(p.id)}
+                        style={({ pressed }) => [styles.resCard, { borderLeftColor: statoColor(p.statoArrivo, colors) }, pressed && { opacity: 0.8 }]}
+                      >
+                        <View style={styles.flex}>
+                          <Text style={styles.resCode}>{p.codice}</Text>
+                          <Text style={styles.resDest} numberOfLines={1}>{p.destinazione}</Text>
+                          {!!p.merce && <Text style={styles.resMerce} numberOfLines={1}>{p.merce}</Text>}
+                          <Text style={styles.resMeta} numberOfLines={1}>
+                            {p.mittente}
+                            {p.numeroColli ? ` · ${p.numeroColli} colli` : ""}
+                          </Text>
+                        </View>
+                        <MaterialDesignIcons name="chevron-right" size={30} color={colors.muted} />
+                      </Pressable>
+                    ))}
+                  </View>
+                </Animated.View>
+              );
+            })}
           </View>
         )}
       </ScrollView>
@@ -158,7 +186,29 @@ export default function Magazzino() {
   );
 }
 
+function groupByOrder(list: Pedana[]) {
+  const map = new Map<string, Pedana[]>();
+  for (const p of list) {
+    const k = p.numeroOrdine || "—";
+    if (!map.has(k)) map.set(k, []);
+    map.get(k)!.push(p);
+  }
+  return [...map.entries()].map(([numero, items]) => ({ numero, items }));
+}
+
 const useStyles = makeStyles((c) => ({
+  group: { backgroundColor: c.surfaceSecondary, borderRadius: 14, borderWidth: 1, borderColor: c.border, overflow: "hidden", marginBottom: 6 },
+  groupHead: { backgroundColor: c.brandPrimary, flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14, paddingVertical: 10 },
+  groupLabel: { fontFamily: fonts.textBold, fontSize: 10, letterSpacing: 1.2, color: c.brandSoftText },
+  groupNum: { fontFamily: fonts.displayHeavy, fontSize: 26, color: c.onBrandPrimary },
+  groupRight: { alignItems: "flex-end" },
+  groupDate: { fontFamily: fonts.textBold, fontSize: 14, color: c.onBrandPrimary },
+  groupMeta: { fontFamily: fonts.textMedium, fontSize: 12, color: c.brandSoftText },
+  progressRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: c.brandTertiary },
+  progressTrack: { flex: 1, height: 8, borderRadius: 4, backgroundColor: c.border, overflow: "hidden" },
+  progressFill: { height: 8, borderRadius: 4, backgroundColor: c.success },
+  progressText: { fontFamily: fonts.textBold, fontSize: 13, color: c.onBrandTertiary },
+  groupItems: { padding: 10, gap: 8 },
   root: { flex: 1, backgroundColor: c.surface },
   flex: { flex: 1 },
   searchCard: { backgroundColor: c.surfaceSecondary, padding: 16, borderBottomWidth: 1, borderBottomColor: c.border },

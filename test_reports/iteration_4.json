@@ -1,0 +1,28 @@
+{
+  "summary": "Frontend-only verification of the new 'Raggruppa per Ordine' feature in Magazzino > Cerca Pedana at viewport 390x844. All 5 requested flows pass end-to-end against the real production backend (24 pedane / 12 ordini). Empty search renders magazzino-results-count = 'Tutta la merce registrata · 24 pedane · 12 ordini' and exactly 12 magazzino-group-{numeroOrdine} containers; each exposes magazzino-group-numero-{n}, magazzino-group-summary-{n} ('N pedan(a|e)[ · X colli]') and magazzino-group-progress-{n} ('Scaricate done/N'). Counts cross-checked against GET /api/pedane/tutte grouped by numeroOrdine - all 12 ordini match on pedane-count, sum(numeroColli) and sum(statoArrivo==='completo'); total 24 cards distributed across the 12 groups with no pedana appearing in more than one group. Tapping a magazzino-result-* card opens pedana-detail-card; magazzino-back-to-results-button returns to the grouped list with grouping intact. Partial search '019' still groups results (22 pedane · 11 ordini). Exact code '2619-019315' auto-opens pedana-detail-card. 'ZZZ-NOPE-9999' shows magazzino-no-results. magazzino-search-clear-button restores the full grouped list. No horizontal overflow of any group container or header text at 390 CSS px; no React Native red screen or new deprecation warnings. No data modified; office password unchanged (antolini2024).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/test_reports/pytest/pytest_tutte.xml (pre-existing backend coverage for /api/pedane/tutte)"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "magazzino.tsx groupByOrder preserves insertion order from the API (which is sorted dataConsegna DESC, createdAt DESC) so groups appear chronologically newest-first - correct and matches the design intent.",
+    "The pedana testID is 'magazzino-result-{codice}'. Real data contains duplicate codici across different ordini (e.g. 2619-019378 appears 3x, 2620-004471/2619-019344/2619-019331/2619-019314 each 2x). The grouping is still correct (each pedana shows in exactly one group), but the testID is NOT globally unique when scoped at the whole list - automation that locates a card by codice alone can resolve to multiple nodes. Consider including numeroOrdine (or pedana.id) in the testID (e.g. 'magazzino-result-{numeroOrdine}-{codice}') for safer test selectors. Non-blocking.",
+    "Italian pluralization is correctly applied in group header ('1 pedana' vs 'N pedane'); the ' · X colli' suffix is omitted when colli==0 which is appropriate.",
+    "Progress bar width uses done/g.items.length which is always >=1 so no division-by-zero (groupByOrder never creates empty groups).",
+    "FadeInDown delay is capped at index 6, keeping the staggered entrance snappy regardless of ordini count."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "not tested this iteration", "frontend": "100% (5/5 feature flows pass)"},
+  "seed_data_creation": "None. No TEST data created or modified; the 24 real pedane were only read.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Public URL: https://pedana-lookup.preview.emergentagent.com (EXPO_PUBLIC_BACKEND_URL). Office pw: antolini2024. The role selection screen exposes testIDs 'accesso-ufficio-button' and 'accesso-magazzino-button'. Magazzino grouping testIDs: magazzino-group-{numeroOrdine}, magazzino-group-numero-{numeroOrdine}, magazzino-group-summary-{numeroOrdine}, magazzino-group-progress-{numeroOrdine}. Pedana card testIDs are magazzino-result-{codice} and may NOT be globally unique due to repeated codici across different ordini - scope selectors by parent group when ambiguity matters. GET /api/pedane/tutte is public and used when the search input is empty; the current snapshot has 24 pedane across 12 ordini (all with statoArrivo != 'completo', so every group shows 'Scaricate 0/N'). Avoid destructive ops on real data.",
+  "rca_of_issue": "N/A - feature works end-to-end; no bugs found."
+}
