@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, Depends, Header, HTTPException, UploadFile, File
+from fastapi import FastAPI, APIRouter, Depends, Header, HTTPException, UploadFile, File, Query
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -251,6 +251,12 @@ async def get_pedana(pid: str):
     if not doc:
         raise HTTPException(status_code=404, detail="Pedana non trovata")
     return Pedana.from_mongo(doc)
+
+
+@api.get("/riepilogo", response_model=List[Pedana])
+async def riepilogo(data: str = Query(..., pattern=r"^\d{4}-\d{2}-\d{2}$"), _=Depends(require_ufficio)):
+    docs = await db.pedane.find({"dataConsegna": data}).sort([("numeroOrdine", 1), ("codice", 1)]).to_list(2000)
+    return [Pedana.from_mongo(d) for d in docs]
 
 
 @api.post("/pedane/duplicati")

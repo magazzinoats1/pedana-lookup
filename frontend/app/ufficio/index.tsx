@@ -141,6 +141,7 @@ export default function Ufficio() {
         subtitle={coop ? `Coop: ${coop} — Ufficio` : "Cooperativa non impostata — Ufficio"}
         right={
           <View style={styles.headActions}>
+            <IconButton icon="view-dashboard-outline" tone="onBrand" onPress={() => router.push("/ufficio/riepilogo")} testID="ufficio-riepilogo-button" />
             <IconButton icon="cog-outline" tone="onBrand" onPress={() => setShowSettings(true)} testID="ufficio-settings-button" />
             <IconButton icon="logout" tone="onBrand" onPress={esci} testID="ufficio-esci-button" />
           </View>

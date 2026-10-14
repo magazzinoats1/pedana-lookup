@@ -1,0 +1,31 @@
+{
+  "summary": "Full end-to-end test of 'Riepilogo Ufficio' live board + 'Report da Condividere' at 390x844. Backend: 6/6 pytest cases pass (/app/backend/tests/test_riepilogo.py). GET /api/riepilogo requires Bearer (401 without), enforces YYYY-MM-DD regex (422 on '2026-1-1' and '01/01/2026'), filters by dataConsegna and sorts by numeroOrdine asc then codice asc (verified our seeded TEST_RIEP_A_* comes before TEST_RIEP_B_* and TEST-B1 before TEST-B2). PATCH to a seeded pedana reflects immediately in the next /riepilogo call with arrivoCompletoDa+arrivoCompletoAt. Frontend: seeded 2 TEST orders (2 pedane today + 1 pedana tomorrow) via office API then exercised the UX end-to-end: (1) /ufficio header shows ufficio-riepilogo-button which navigates to the new screen; (2) initial riepilogo-date-label='Oggi' and riepilogo-date-value shows today's date in it-IT; (3) all 5 stats (riepilogo-stat-camion '0/4', pedane 9, scaricate 0, parziali 0, attesa 9) exactly match /api/riepilogo?data=today; (4) riepilogo-total-progress shows '0% scaricato'; (5) riepilogo-ordine-TEST_UI_* card is present with riepilogo-ordine-progress-* '0/2' and both pedane rows riepilogo-pedana-{id} rendered; (6) riepilogo-updated-at shows 'Live · aggiornato HH:MM:SS'; (7) riepilogo-next-day-button -> label 'Domani' and the tomorrow test order card is visible; riepilogo-today-button -> 'Oggi'; riepilogo-prev-day-button -> 'Ieri'; (8) LIVE REFRESH: PATCH /pedane/{id}/stato (completo, operatore='Tester') while the Riepilogo screen was focused on Oggi -> UI auto-refreshed from '0/2' to '1/2' at ~14s (REFRESH_MS=15s), with no manual reload; the row text became 'Scaricato\\n12:45 · Tester' (hh:mm · operatore); (9) navigating 10 days back shows riepilogo-empty; (10) riepilogo-share-report-button triggers window.print (invocations=1) with zero error toasts; (11) riepilogo-back-button returns to the ufficio list. All TEST seed data (3 pedane) cleaned up via DELETE. No red screen, no console errors (just reanimated 'shadow* deprecated' notice, not from new files). No real DB rows modified.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_riepilogo.py",
+    "/app/test_reports/pytest/pytest_riepilogo.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py L257: GET /api/riepilogo uses Query(..., pattern=r'^\\d{4}-\\d{2}-\\d{2}$') so pydantic rejects malformed dates with 422 before touching Mongo. Clean.",
+    "server.py L258: .sort([('numeroOrdine', 1), ('codice', 1)]) matches the frontend groupOrders() expectation — pedane within an order land in ascending codice order which is what the UI shows.",
+    "riepilogo.tsx L62: setInterval(load, REFRESH_MS) is wrapped in useFocusEffect so the 15s polling pauses when the user leaves the screen; cleanup runs on unfocus. Verified live refresh works at ~14s elapsed.",
+    "riepilogo.tsx L82: camionFatti counts orders where EVERY pedana is completo. The 4/4 total includes real data on today's date — UI correctly computed 0/4 vs API groupings.",
+    "report.ts L74-76: on web Print.printAsync({html}) delegates to window.print which was stubbed in test — no error toast, no crash.",
+    "report.ts L15-23: groupOrders dedupes by numeroOrdine|'—' preserving insertion order, so sorting by numeroOrdine in the backend determines display order. Deterministic.",
+    "ufficio/index.tsx L144: ufficio-riepilogo-button navigates via router.push('/ufficio/riepilogo') — testID present and tappable."
+  ],
+  "updated_files": ["/app/backend/tests/test_riepilogo.py (new)"],
+  "success_rate": {"backend": "100% (6/6)", "frontend": "100% (all 7 feature flows)"},
+  "seed_data_creation": "Backend pytest fixture seeds 3 pedane across 2 TEST orders with dataConsegna=today; all deleted on teardown. Frontend playwright test seeds 3 pedane across 2 TEST orders (TEST_UI_<stamp> today with 2 pedane + TEST_UI_TOM_<stamp> tomorrow with 1 pedana) via office POST /api/pedane; DELETEd in the finally block. No real records touched. Office password unchanged.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Public URL: https://pedana-lookup.preview.emergentagent.com. Office pw: antolini2024. 'Riepilogo' live board + 'Condividi report' fully working. New reusable backend test: /app/backend/tests/test_riepilogo.py (6 tests, self-cleaning). Key testIDs on /ufficio/riepilogo: riepilogo-back-button, riepilogo-updated-at, riepilogo-date-label, riepilogo-date-value, riepilogo-prev-day-button, riepilogo-next-day-button, riepilogo-today-button, riepilogo-stat-camion, riepilogo-stat-pedane, riepilogo-stat-scaricate, riepilogo-stat-parziali, riepilogo-stat-attesa, riepilogo-total-progress, riepilogo-ordine-{numeroOrdine}, riepilogo-ordine-progress-{numeroOrdine}, riepilogo-pedana-{id}, riepilogo-empty, riepilogo-share-report-button, riepilogo-error. Live polling interval = 15000ms (REFRESH_MS in riepilogo.tsx). On web, condividiReport() calls expo-print's Print.printAsync which internally invokes window.print — stub window.print in playwright with page.add_init_script('window.print=()=>{}') before navigation to avoid the browser's print dialog hanging. For login, prefer page.evaluate('document.querySelector(\\'[data-testid=\\\"ufficio-login-button\\\"]\\').click()') because the Sheet-rendered login button sits just below the 844px viewport on this app; otherwise temporarily grow viewport to 390x900 for the login step. Cloudflare occasionally returns 1010 to urllib — use requests with a User-Agent header for backend seeding during playwright runs.",
+  "rca_of_issue": "N/A — feature works end-to-end as specified; no bugs found."
+}

@@ -23,6 +23,8 @@ User uploaded a KÖLLA transport-order PDF and a reference web app (GestioneLogi
 - Magazzino date chips (Tutte le date / Oggi / Domani) combined with status chips and search
 - 'Scarica ordine intero' button per order group with confirm sheet (POST /api/ordini/scarica, public)
 - Nome magazziniere: list viewable by anyone; marking stato / scarica ordine only after entering worker name (saved on device); name recorded (arrivoCompletoDa / arrivoParzialeDa) and shown in Magazzino detail and Ufficio list
+- Riepilogo Ufficio (/ufficio/riepilogo): live board per day (auto-refresh 15s), stats camion/pedane/scaricate/parziali/attesa, per-order progress with time + operatore (GET /api/riepilogo)
+- Daily report: PDF via expo-print + share sheet (web: print dialog), per order table with stato, ora, operatore
 - Security audit run: SEC-001 default office password (change it), SEC-002 wildcard CORS, hardening: login rate limit, PDF size cap
 
 ## Backlog
