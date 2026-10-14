@@ -15,9 +15,12 @@ User uploaded a KÖLLA transport-order PDF and a reference web app (GestioneLogi
 - AI PDF import tested on sample (6 pedane, order 25023467)
 - Start screen changed to white background (user request)
 - Drag & drop PDF import on web (drop anywhere on Nuovo Ordine screen); AI prompt tightened so mittente is company name only
-- Mittente moved from order data to each pedana row (required). PDF import now uses the short position code printed below (e.g. 2619-019320) and the supplier name on the right (ORCHIDEA, BERTOLI FRUIT, MORANDO GRAZIANO); rows with the same position are merged and their colli summed
+- Mittente moved from order data to each pedana row (required). PDF import now uses the short position code printed below (e.g. 2619-019320) and the supplier name on the right (ORCHIDEA, BERTOLI FRUIT, MORANDO GRAZIANO); each PDF row becomes its own pedana
+- Same posizione allowed on multiple pedane (no blocking); new per-pedana field 'Tipo merce' (form, list, magazzino results/detail, search, PDF import)
+- Security audit run: SEC-001 default office password (change it), SEC-002 wildcard CORS, hardening: login rate limit, PDF size cap
 
 ## Backlog
+- P1: Security fixes from audit (force password change on first login, login rate limit, PDF size limit, restrict CORS)
 - P1: Barcode/label scan for positions (camera)
 - P1: Daily arrivals overview / filters by stato and date
 - P2: Export day report (PDF/CSV) to share with clients

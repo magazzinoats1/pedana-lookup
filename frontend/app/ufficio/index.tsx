@@ -113,6 +113,7 @@ export default function Ufficio() {
             </View>
           </View>
           <Text style={styles.dest} numberOfLines={2}>{o.destinazione}</Text>
+          {!!o.merce && <Text style={styles.merce} numberOfLines={2}>{o.merce}</Text>}
           <View style={styles.metaGrid}>
             <Meta label="MITTENTE" value={o.mittente} />
             <Meta label="DATA" value={formatDate(o.dataConsegna)} />
@@ -251,6 +252,7 @@ const useStyles = makeStyles((c) => ({
   statoText: { fontFamily: fonts.textSemi, fontSize: 12 },
   actions: { flexDirection: "row", gap: 6 },
   dest: { fontFamily: fonts.display, fontSize: 22, color: c.onSurface },
+  merce: { fontFamily: fonts.textSemi, fontSize: 14, color: c.onBrandTertiary },
   metaGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
   meta: { minWidth: "40%", flexShrink: 1 },
   metaLabel: { fontFamily: fonts.textBold, fontSize: 10, color: c.muted, letterSpacing: 0.8 },

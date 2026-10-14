@@ -139,6 +139,7 @@ export default function Magazzino() {
                   <View style={styles.flex}>
                     <Text style={styles.resCode}>{p.codice}</Text>
                     <Text style={styles.resDest} numberOfLines={1}>{p.destinazione}</Text>
+                    {!!p.merce && <Text style={styles.resMerce} numberOfLines={1}>{p.merce}</Text>}
                     <Text style={styles.resMeta} numberOfLines={1}>
                       Ord. {p.numeroOrdine} · {p.mittente}
                       {p.numeroColli ? ` · ${p.numeroColli} colli` : ""}
@@ -195,6 +196,7 @@ const useStyles = makeStyles((c) => ({
   },
   resCode: { fontFamily: fonts.display, fontSize: 26, color: c.onSuccessTint },
   resDest: { fontFamily: fonts.textBold, fontSize: 16, color: c.onSurface },
+  resMerce: { fontFamily: fonts.textSemi, fontSize: 14, color: c.onBrandTertiary },
   resMeta: { fontFamily: fonts.text, fontSize: 13, color: c.muted },
   backRow: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 44 },
   backText: { fontFamily: fonts.textSemi, fontSize: 15, color: c.brandSecondary },

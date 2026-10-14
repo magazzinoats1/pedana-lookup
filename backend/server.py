@@ -79,6 +79,7 @@ class Pedana(BaseDocument):
     codice: str
     destinazione: str
     numeroColli: str = ""
+    merce: str = ""
     createdAt: str = Field(default_factory=now_iso)
     ultimaRettifica: Optional[str] = None
     statoArrivo: Literal["attesa", "parziale", "completo"] = "attesa"
@@ -100,6 +101,7 @@ class PedanaIn(BaseModel):
     destinazione: str
     numeroColli: str = ""
     mittente: str = ""
+    merce: str = ""
 
 
 class CreateReq(BaseModel):
@@ -205,7 +207,7 @@ async def list_pedane(q: str = "", _=Depends(require_ufficio)):
     query = {}
     q = q.strip()
     if q:
-        query = {"$or": [{f: rx(q)} for f in ["numeroOrdine", "codice", "agenzia", "mittente", "destinazione"]]}
+        query = {"$or": [{f: rx(q)} for f in ["numeroOrdine", "codice", "agenzia", "mittente", "destinazione", "merce"]]}
     docs = await db.pedane.find(query).sort("createdAt", -1).to_list(1000)
     return [Pedana.from_mongo(d) for d in docs]
 
@@ -262,7 +264,7 @@ async def create_pedane(body: CreateReq, _=Depends(require_ufficio)):
             numeroOrdine=f.numeroOrdine.strip(), agenzia=f.agenzia.strip(),
             mittente=(p.mittente.strip() or f.mittente.strip()), dataConsegna=f.dataConsegna,
             note=f.note.strip(), codice=p.codice.strip(), destinazione=p.destinazione.strip(),
-            numeroColli=p.numeroColli.strip(),
+            numeroColli=p.numeroColli.strip(), merce=p.merce.strip(),
         )
         await db.pedane.insert_one(item.to_mongo())
         created.append(item)
@@ -276,7 +278,7 @@ async def update_pedana(pid: str, body: UpdateReq, _=Depends(require_ufficio)):
         "numeroOrdine": f.numeroOrdine.strip(), "agenzia": f.agenzia.strip(),
         "mittente": (p.mittente.strip() or f.mittente.strip()), "dataConsegna": f.dataConsegna,
         "note": f.note.strip(), "codice": p.codice.strip(), "destinazione": p.destinazione.strip(),
-        "numeroColli": p.numeroColli.strip(), "ultimaRettifica": now_iso(),
+        "numeroColli": p.numeroColli.strip(), "merce": p.merce.strip(), "ultimaRettifica": now_iso(),
     }
     res = await db.pedane.find_one_and_update({"id": pid}, {"$set": patch}, return_document=True)
     if not res:
@@ -316,7 +318,7 @@ Rispondi SOLO con JSON valido, senza testo extra, con questa struttura esatta:
   "dataConsegna": "data di scarico/consegna in formato YYYY-MM-DD",
   "note": "istruzioni importanti brevi (temperatura, avvisi), max 200 caratteri",
   "pedane": [
-    {"codice": "codice posizione CORTO stampato SOTTO il codice lungo, nel formato NNNN-NNNNNN (es. 2619-019320, 2619-019318, 2619-019321). NON usare il codice lungo sopra (es. 2619-019320-10000 o A2619-023221-10000)", "destinazione": "nome destinatario + città (luogo di scarico)", "numeroColli": "numero colli (valore K0/KO) come intero senza decimali", "mittente": "nome stampato A DESTRA della riga, in cima alla colonna tipologia merce (es. ORCHIDEA, BERTOLI FRUIT, MORANDO GRAZIANO). Scrivilo in maiuscole come nel documento, senza descrizione merce"}
+    {"codice": "codice posizione CORTO stampato SOTTO il codice lungo, nel formato NNNN-NNNNNN (es. 2619-019320, 2619-019318, 2619-019321). NON usare il codice lungo sopra (es. 2619-019320-10000 o A2619-023221-10000)", "destinazione": "nome destinatario + città (luogo di scarico)", "numeroColli": "numero colli (valore K0/KO) come intero senza decimali", "mittente": "nome stampato A DESTRA della riga, in cima alla colonna tipologia merce (es. ORCHIDEA, BERTOLI FRUIT, MORANDO GRAZIANO). Scrivilo in maiuscole come nel documento, senza descrizione merce", "merce": "tipo di merce breve (es. Uva rossa senza semi, Uva bianca senza semi, Radicchio Trevisano, Radicchio Castelfranco)"}
   ]
 }
 Includi OGNI riga presente nella sezione Luogo di carico (non ripetere le righe della sezione Luogo di scarico). Se un dato manca usa stringa vuota."""
@@ -356,24 +358,16 @@ async def import_pdf(file: UploadFile = File(...), _=Depends(require_ufficio)):
         raise HTTPException(status_code=502, detail=f"Lettura PDF non riuscita: {str(e)[:120]}")
     finally:
         os.unlink(path)
-    # Merge rows sharing the same short position code (sum colli)
-    merged: dict = {}
+    # One pedana per PDF row (rows may share the same position)
+    pedane = []
     for p in parsed.get("pedane", []) or []:
-        codice = str(p.get("codice", "") or "").strip()
-        colli = re.sub(r"[.,]0+$", "", str(p.get("numeroColli", "") or "").strip())
-        key = codice.lower()
-        if key in merged and codice:
-            prev = merged[key]
-            if prev["numeroColli"].isdigit() and colli.isdigit():
-                prev["numeroColli"] = str(int(prev["numeroColli"]) + int(colli))
-            continue
-        merged[key or str(uuid.uuid4())] = {
-            "codice": codice,
+        pedane.append({
+            "codice": str(p.get("codice", "") or "").strip(),
             "destinazione": str(p.get("destinazione", "") or "").strip(),
-            "numeroColli": colli,
+            "numeroColli": re.sub(r"[.,]0+$", "", str(p.get("numeroColli", "") or "").strip()),
             "mittente": str(p.get("mittente", "") or "").strip(),
-        }
-    pedane = list(merged.values())
+            "merce": str(p.get("merce", "") or "").strip(),
+        })
     return {
         "numeroOrdine": str(parsed.get("numeroOrdine", "") or "").strip(),
         "agenzia": str(parsed.get("agenzia", "") or "").strip(),

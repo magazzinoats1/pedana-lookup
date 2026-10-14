@@ -1,0 +1,38 @@
+{
+  "summary": "Full backend + frontend regression for the LATEST feature changes: (1) multiple pedane with the SAME codice (posizione) now register without blocking, and (2) 'Tipo merce' field is persisted per pedana. Backend: 31/31 pytest tests PASS (6 new in test_merce_duplicate.py + 25 existing). New tests confirm: POST /api/pedane accepts 2 pedane with identical codice and different merce, each saved separately; GET /api/pedane?q=<merce text> finds by merce text (merce indexed in list search); GET /api/pedane/cerca?q=<codice> returns ALL pedane with that codice including merce; PUT /api/pedane/{id} updates merce; POST /api/import-pdf with the provided sample returns numeroOrdine 25023467 with 6 pedane NOT merged (short codes 2619-019320 x2, 2619-019318 x2, 2619-019321 x2) and each row carries mittente (ORCHIDEA / BERTOLI FRUIT / MORANDO GRAZIANO) + merce. Frontend (390x844 Expo web): login → ufficio OK; new order form: form-mittente-input DOES NOT exist (correct), each row has form-pedana-codice/mittente/destinazione/colli/merce-input-{i} testIDs; added 2 rows with the SAME codice, form-save-button succeeded WITHOUT any 'duplicata' blocking error (dup-sheet did not appear for a brand-new numeroOrdine, as expected) and both pedane visible in ufficio list showing merce text; edit of an existing pedana reloaded mittente + merce into row 0 correctly; Magazzino search by that posizione shows both results via magazzino-result-{codice} with merce visible on each; detail view renders pedana-detail-merce and pedana-detail-mittente with correct values. All TEST_* data cleaned up; office password remains antolini2024.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "web shadow styles", "issue": "Console warning: '\"shadow*\" style props are deprecated. Use \"boxShadow\".' Likely from a shadow* StyleSheet prop; non-blocking but should migrate to boxShadow for RN web."},
+      {"component": "pointerEvents prop", "issue": "Console warning: 'props.pointerEvents is deprecated. Use style.pointerEvents' from some RN component usage; non-blocking."}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_backend.py",
+    "/app/backend/tests/test_merce_duplicate.py",
+    "/app/backend/tests/conftest.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "(Optional) Migrate RN inline shadow* style props to style.boxShadow and move pointerEvents from prop into style, to silence deprecation warnings on RN Web."
+  ],
+  "critical_code_review_comments": [
+    "server.py: list_pedane now includes 'merce' in the $or search fields — matches review request.",
+    "cerca endpoint uses exact codice match first and returns up to 100 rows → correctly returns all pedane sharing the same codice.",
+    "create_pedane creates one DB row per PedanaIn (no merging by codice), honoring the 'duplicate posizione allowed' requirement.",
+    "mittente fallback (p.mittente.strip() or f.mittente.strip()) preserved for backward compatibility, but form sends mittente='' in payloadForm so per-row mittente is authoritative — consistent with UI.",
+    "PDF import prompt updated to extract per-row mittente and merce, and short codice format NNNN-NNNNNN; verified via live Gemini call."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_merce_duplicate.py (new, 6 tests covering duplicate codice + merce + updated PDF import)"
+  ],
+  "success_rate": {"backend": "100% (31/31)", "frontend": "100% core flows for new feature"},
+  "seed_data_creation": "Ephemeral TEST_* and TPOS* data created during tests. All cleaned up via DELETE (2 leftover TEST pedane also cleaned at end). Office password remains antolini2024. Cooperativa setting cleared.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Public URL: https://pedana-lookup.preview.emergentagent.com (env key EXPO_PUBLIC_BACKEND_URL). Office pw: antolini2024. The role selection screen uses testIDs 'accesso-ufficio-button' and 'accesso-magazzino-button' (NOT 'role-ufficio-card'). PDF import now returns one row per PDF line; the Gemini-returned 'MORANDO GRAZIANO' may include a trailing suffix (observed 'MORANDO GRAZIANO S.R'), so use substring assertions, not equality. For buttons inside bottom sheets, use scroll_into_view_if_needed + dispatch_event('click'). PDF import takes ~10s via Gemini 3 Flash; use timeout>=90s.",
+  "rca_of_issue": "N/A — no bugs found. Feature works end-to-end."
+}

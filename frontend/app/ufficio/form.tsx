@@ -14,7 +14,7 @@ import { Button, Field, IconButton } from "@/src/components/ui";
 import { fonts, makeStyles, useTheme } from "@/src/theme";
 
 const emptyForm = { numeroOrdine: "", agenzia: "", note: "" };
-const emptyRow: PedanaRow = { codice: "", destinazione: "", numeroColli: "", mittente: "" };
+const emptyRow: PedanaRow = { codice: "", destinazione: "", numeroColli: "", mittente: "", merce: "" };
 
 type Errors = {
   numeroOrdine?: string;
@@ -68,7 +68,7 @@ export default function OrdineFormScreen() {
       .then((o) => {
         setForm({ numeroOrdine: o.numeroOrdine, agenzia: o.agenzia, note: o.note });
         setData(isoToIt(o.dataConsegna));
-        setRows([{ codice: o.codice, destinazione: o.destinazione, numeroColli: o.numeroColli, mittente: o.mittente }]);
+        setRows([{ codice: o.codice, destinazione: o.destinazione, numeroColli: o.numeroColli, mittente: o.mittente, merce: o.merce || "" }]);
       })
       .catch((e) => toast(e.message, "error"))
       .finally(() => setLoading(false));
@@ -167,24 +167,14 @@ export default function OrdineFormScreen() {
     if (!data.trim()) e.data = "Obbligatorio";
     else if (!iso) e.data = "Formato GG/MM/AAAA";
     const rowErr: Errors["rows"] = {};
-    const seen = new Map<string, number>();
-    const internal = new Set<number>();
     rows.forEach((r, i) => {
       const re: { codice?: string; destinazione?: string; mittente?: string } = {};
       if (!r.codice.trim()) re.codice = "Obbligatorio";
       if (!r.mittente.trim()) re.mittente = "Obbligatorio";
       if (!r.destinazione.trim()) re.destinazione = "Obbligatorio";
-      const n = r.codice.trim().toLowerCase();
-      if (n) {
-        if (seen.has(n)) {
-          internal.add(i);
-          internal.add(seen.get(n)!);
-        } else seen.set(n, i);
-      }
       if (Object.keys(re).length) rowErr[i] = re;
     });
     if (Object.keys(rowErr).length) e.rows = rowErr;
-    if (internal.size) e.internalDup = [...internal];
     return { e, iso };
   }
 
@@ -213,7 +203,7 @@ export default function OrdineFormScreen() {
     const { e } = validate();
     if (Object.keys(e).length) {
       setErrors(e);
-      toast(e.internalDup ? "Due pedane hanno la stessa posizione: correggile" : "Compila i campi obbligatori", "error");
+      toast("Compila i campi obbligatori", "error");
       return;
     }
     setErrors({});
@@ -221,7 +211,7 @@ export default function OrdineFormScreen() {
     try {
       const d = await api<DupResult>("/pedane/duplicati", {
         method: "POST",
-        body: { numeroOrdine: editingId ? "" : form.numeroOrdine, codici: rows.map((r) => r.codice), excludeId: editingId },
+        body: { numeroOrdine: editingId ? "" : form.numeroOrdine, codici: [], excludeId: editingId },
       });
       setSaving(false);
       if (d.codiceMatches.length || d.numeroMatches.length) {
@@ -313,10 +303,9 @@ export default function OrdineFormScreen() {
               Pedane / Posizioni {rows.length > 1 ? `(${rows.length})` : ""}
             </Text>
           </View>
-          {!editingId && <Text style={styles.rowHint}>Stesso ordine, più pedane con posizione e destinazione diverse</Text>}
+          {!editingId && <Text style={styles.rowHint}>Stesso ordine, più pedane (anche con la stessa posizione)</Text>}
           {rows.map((r, i) => {
             const re = errors.rows?.[i];
-            const isDup = errors.internalDup?.includes(i);
             return (
               <Animated.View key={i} entering={FadeInDown.duration(200)} exiting={FadeOut} style={styles.rowCard} testID={`form-pedana-row-${i}`}>
                 <View style={styles.rowTop}>
@@ -330,7 +319,7 @@ export default function OrdineFormScreen() {
                   value={r.codice}
                   onChangeText={(t) => setRow(i, "codice", t)}
                   placeholder="es. 2619-019320"
-                  error={re?.codice ?? (isDup ? "Posizione duplicata in questo modulo" : undefined)}
+                  error={re?.codice}
                   testID={`form-pedana-codice-input-${i}`}
                   autoCapitalize="characters"
                   autoCorrect={false}
@@ -345,6 +334,7 @@ export default function OrdineFormScreen() {
                     <Field label="N° Colli" value={r.numeroColli} onChangeText={(t) => setRow(i, "numeroColli", t.replace(/[^0-9]/g, ""))} placeholder="es. 84" keyboardType="number-pad" testID={`form-pedana-colli-input-${i}`} />
                   </View>
                 </View>
+                <Field label="Tipo merce" value={r.merce} onChangeText={(t) => setRow(i, "merce", t)} placeholder="es. Uva rossa senza semi, Radicchio…" testID={`form-pedana-merce-input-${i}`} />
               </Animated.View>
             );
           })}

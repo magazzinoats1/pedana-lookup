@@ -33,6 +33,13 @@ export function PedanaDetail({ pedana, onUpdated }: { pedana: Pedana; onUpdated:
         </View>
       </View>
 
+      {!!pedana.merce && (
+        <View style={styles.merceBox}>
+          <Text style={styles.smallLabel}>TIPO MERCE</Text>
+          <Text style={styles.merce} testID="pedana-detail-merce">{pedana.merce}</Text>
+        </View>
+      )}
+
       <View style={styles.section}>
         <StatoToggle pedana={pedana} onUpdated={onUpdated} />
       </View>
@@ -70,6 +77,8 @@ const useStyles = makeStyles((c) => ({
   orderPill: { backgroundColor: c.brandTertiary, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, alignItems: "flex-end" },
   order: { fontFamily: fonts.display, fontSize: 24, color: c.brandPrimary },
   section: {},
+  merceBox: { backgroundColor: c.brandTertiary, borderRadius: 10, padding: 12 },
+  merce: { fontFamily: fonts.textBold, fontSize: 17, color: c.onBrandTertiary, marginTop: 2 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   note: { flexDirection: "row", gap: 8, backgroundColor: c.warningTint, borderRadius: 10, padding: 12 },
   noteText: { flex: 1, fontFamily: fonts.text, fontSize: 14, color: c.onWarningTint },
