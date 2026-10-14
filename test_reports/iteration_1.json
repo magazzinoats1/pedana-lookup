@@ -1,0 +1,44 @@
+{
+  "summary": "Full backend + frontend test for Gestione Logistica Antolini. Backend: 25/25 pytest tests PASS (auth, change-password with restore, pedane CRUD, duplicati, public cerca exact+partial, stato transitions attesa/parziale/completo, settings, PDF import via Gemini 3 Flash returning numeroOrdine 25023467 with 6 pedane in ~10s). Frontend (390x844 Expo web): splash→accesso OK, Ufficio login (wrong→error, correct→list) OK, create order with Oggi chip OK, search+count OK, duplicate codice sheet appears OK, settings sheet saves cooperativa OK, Magazzino exact codice→detail OK, parziale with note+timestamp OK, completo OK, no-results state OK, delete+confirm OK. Password restored to antolini2024 after testing. Residual test data cleaned up via API.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Accesso Ufficio password sheet", "issue": "On 390x844 viewport with no keyboard, the ufficio-login-button sits just below the sheet's initial fold and requires scroll_into_view to tap. On real mobile the keyboard pushes layout up so OK, but consider ensuring the Entra button is always visible when the sheet opens (e.g. KeyboardAvoidingView + max-height tuning). Reference: /app/frontend/app/index.tsx", "testID": "ufficio-login-button", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Accesso Ufficio sheet", "issues": ["Wrong-password error is shown inline below the input ('Password errata') with red border — not via toast-message. This is correct UX; just noting the review spec mentioned 'toast testID' which is not used for this error. No action required unless E1 wants to unify to toast."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_backend.py",
+    "/app/backend/tests/conftest.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "(Optional LOW) Ensure Entra button is visible without needing to scroll in the Accesso Ufficio bottom sheet on short/mid viewports (keyboard-closed state).",
+    "No functional fixes required — all critical flows pass."
+  ],
+  "critical_code_review_comments": [
+    "server.py excludes Mongo _id correctly via BaseDocument.from_mongo — good.",
+    "All endpoints use Pydantic validation; auth sessions use SHA256-hashed tokens with TTL index — good.",
+    "No deprecated Expo packages (no expo-av / expo-barcode-scanner / expo-background-fetch).",
+    "Frontend uses EXPO_PUBLIC_BACKEND_URL — correct for Expo.",
+    "server.py is 404 lines, within file-size budget."
+  ],
+  "updated_files": [
+    "/app/backend/tests/__init__.py (new)",
+    "/app/backend/tests/conftest.py (new)",
+    "/app/backend/tests/test_backend.py (new, 25 tests)"
+  ],
+  "success_rate": {"backend": "100% (25/25)", "frontend": "100% core flows"},
+  "seed_data_creation": "Created ephemeral TEST_* orders and UITEST99887/UI-TEST-POS-001 during testing. All cleaned up (DELETE via API). Cooperativa setting cleared. Password restored to antolini2024.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Public URL: https://pedana-lookup.preview.emergentagent.com (frontend/.env key is EXPO_PUBLIC_BACKEND_URL, not EXPO_BACKEND_URL). Office pw antolini2024 is seeded on first startup. For UI tests on 390x844 web viewport, use scroll_into_view_if_needed + dispatch_event('click') for buttons inside bottom sheets (Playwright's normal click fails with 'outside viewport'). The toast-message testID exists but 'Password errata' is rendered as inline error text in the sheet, not as a toast. PDF import endpoint takes ~8-12s (Gemini 3 Flash) — use requests.post with timeout>=60s and DO NOT set Content-Type on the session (multipart will fail with 422).",
+  "rca_of_issue": "N/A — no bugs to RCA. The two initial pytest failures were test-script bugs (api_client session had Content-Type: application/json which overrode multipart boundary → 422). Fixed by using plain requests.post for /api/import-pdf. The initial Playwright 'element outside viewport' error was fixed by scroll_into_view_if_needed + dispatch_event for buttons inside sliding bottom sheets."
+}

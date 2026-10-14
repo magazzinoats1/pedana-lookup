@@ -1,0 +1,425 @@
+import React, { useEffect, useState } from "react";
+import { ActivityIndicator, Platform, Pressable, Text, View } from "react-native";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import * as DocumentPicker from "expo-document-picker";
+import Animated, { FadeInDown, FadeOut } from "react-native-reanimated";
+import { KeyboardAwareScrollView, KeyboardStickyView } from "react-native-keyboard-controller";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { MaterialDesignIcons } from "@react-native-vector-icons/material-design-icons";
+
+import { api, ImportResult, OrdineForm, Pedana, PedanaRow } from "@/src/api";
+import { Sheet } from "@/src/components/Sheet";
+import { useToast } from "@/src/components/Toast";
+import { Button, Field, IconButton } from "@/src/components/ui";
+import { fonts, makeStyles, useTheme } from "@/src/theme";
+
+const emptyForm = { numeroOrdine: "", agenzia: "", mittente: "", note: "" };
+const emptyRow: PedanaRow = { codice: "", destinazione: "", numeroColli: "", mittente: "" };
+
+type Errors = {
+  numeroOrdine?: string;
+  mittente?: string;
+  data?: string;
+  rows?: Record<number, { codice?: string; destinazione?: string }>;
+  internalDup?: number[];
+};
+type DupResult = { codiceMatches: { codice: string; match: Pedana }[]; numeroMatches: Pedana[] };
+
+const isoToIt = (s: string) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || "");
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : "";
+};
+const itToIso = (s: string) => {
+  const m = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/.exec(s.trim());
+  if (!m) return null;
+  const d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+  if (d.getMonth() !== Number(m[2]) - 1) return null;
+  return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+};
+const dayIt = (offset: number) => {
+  const d = new Date();
+  d.setDate(d.getDate() + offset);
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+};
+
+const STICKY_H = 88;
+
+export default function OrdineFormScreen() {
+  const { id } = useLocalSearchParams<{ id?: string }>();
+  const editingId = id || null;
+  const [form, setForm] = useState(emptyForm);
+  const [data, setData] = useState("");
+  const [rows, setRows] = useState<PedanaRow[]>([{ ...emptyRow }]);
+  const [errors, setErrors] = useState<Errors>({});
+  const [loading, setLoading] = useState(!!editingId);
+  const [saving, setSaving] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importInfo, setImportInfo] = useState("");
+  const [dup, setDup] = useState<DupResult | null>(null);
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const toast = useToast();
+  const { colors } = useTheme();
+  const styles = useStyles();
+
+  useEffect(() => {
+    if (!editingId) return;
+    api<Pedana>(`/pedane/${editingId}`)
+      .then((o) => {
+        setForm({ numeroOrdine: o.numeroOrdine, agenzia: o.agenzia, mittente: o.mittente, note: o.note });
+        setData(isoToIt(o.dataConsegna));
+        setRows([{ codice: o.codice, destinazione: o.destinazione, numeroColli: o.numeroColli, mittente: "" }]);
+      })
+      .catch((e) => toast(e.message, "error"))
+      .finally(() => setLoading(false));
+  }, [editingId, toast]);
+
+  const setF = (k: keyof typeof emptyForm) => (t: string) => setForm((f) => ({ ...f, [k]: t }));
+  const setRow = (i: number, k: keyof PedanaRow, v: string) => setRows((p) => p.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
+
+  async function importaPdf() {
+    const res = await DocumentPicker.getDocumentAsync({ type: "application/pdf", copyToCacheDirectory: true });
+    if (res.canceled || !res.assets?.[0]) return;
+    const a = res.assets[0];
+    const fd = new FormData();
+    if (Platform.OS === "web" && a.file) fd.append("file", a.file);
+    else fd.append("file", { uri: a.uri, name: a.name || "ordine.pdf", type: "application/pdf" } as any);
+    setImporting(true);
+    setImportInfo("");
+    try {
+      const r = await api<ImportResult>("/import-pdf", { method: "POST", form: fd });
+      setForm({ numeroOrdine: r.numeroOrdine, agenzia: r.agenzia, mittente: r.mittente, note: r.note });
+      setData(isoToIt(r.dataConsegna));
+      setRows(
+        r.pedane.length
+          ? r.pedane.map((p) => ({ ...p, mittente: p.mittente && p.mittente !== r.mittente ? p.mittente : "" }))
+          : [{ ...emptyRow }],
+      );
+      setErrors({});
+      setImportInfo(`${r.pedane.length} pedane lette da "${a.name}". Controlla i dati prima di registrare.`);
+      toast("PDF importato");
+    } catch (e: any) {
+      toast(e.message, "error");
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  function validate(): { e: Errors; iso: string | null } {
+    const e: Errors = {};
+    if (!form.numeroOrdine.trim()) e.numeroOrdine = "Obbligatorio";
+    if (!form.mittente.trim()) e.mittente = "Obbligatorio";
+    const iso = itToIso(data);
+    if (!data.trim()) e.data = "Obbligatorio";
+    else if (!iso) e.data = "Formato GG/MM/AAAA";
+    const rowErr: Errors["rows"] = {};
+    const seen = new Map<string, number>();
+    const internal = new Set<number>();
+    rows.forEach((r, i) => {
+      const re: { codice?: string; destinazione?: string } = {};
+      if (!r.codice.trim()) re.codice = "Obbligatorio";
+      if (!r.destinazione.trim()) re.destinazione = "Obbligatorio";
+      const n = r.codice.trim().toLowerCase();
+      if (n) {
+        if (seen.has(n)) {
+          internal.add(i);
+          internal.add(seen.get(n)!);
+        } else seen.set(n, i);
+      }
+      if (Object.keys(re).length) rowErr[i] = re;
+    });
+    if (Object.keys(rowErr).length) e.rows = rowErr;
+    if (internal.size) e.internalDup = [...internal];
+    return { e, iso };
+  }
+
+  async function doSave() {
+    const iso = itToIso(data)!;
+    const payloadForm: OrdineForm = { ...form, dataConsegna: iso };
+    setSaving(true);
+    try {
+      if (editingId) {
+        await api(`/pedane/${editingId}`, { method: "PUT", body: { form: payloadForm, pedana: rows[0] } });
+        toast("Ordine modificato");
+      } else {
+        const created = await api<Pedana[]>("/pedane", { method: "POST", body: { form: payloadForm, pedane: rows } });
+        toast(created.length > 1 ? `${created.length} pedane registrate` : "Ordine registrato");
+      }
+      setDup(null);
+      router.back();
+    } catch (e: any) {
+      toast(e.message, "error");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleSave() {
+    const { e } = validate();
+    if (Object.keys(e).length) {
+      setErrors(e);
+      toast(e.internalDup ? "Due pedane hanno la stessa posizione: correggile" : "Compila i campi obbligatori", "error");
+      return;
+    }
+    setErrors({});
+    setSaving(true);
+    try {
+      const d = await api<DupResult>("/pedane/duplicati", {
+        method: "POST",
+        body: { numeroOrdine: editingId ? "" : form.numeroOrdine, codici: rows.map((r) => r.codice), excludeId: editingId },
+      });
+      setSaving(false);
+      if (d.codiceMatches.length || d.numeroMatches.length) {
+        setDup(d);
+        return;
+      }
+      await doSave();
+    } catch (err: any) {
+      setSaving(false);
+      toast(err.message, "error");
+    }
+  }
+
+  if (loading)
+    return (
+      <View style={[styles.root, styles.center]}>
+        <ActivityIndicator size="large" color={colors.brandSecondary} />
+      </View>
+    );
+
+  return (
+    <View style={styles.root}>
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+        <IconButton icon="arrow-left" tone="onBrand" onPress={() => router.back()} testID="form-back-button" />
+        <Text style={styles.headerTitle}>{editingId ? "Modifica Ordine" : "Nuovo Ordine"}</Text>
+      </View>
+
+      <KeyboardAwareScrollView
+        bottomOffset={STICKY_H + 16}
+        contentContainerStyle={[styles.content, { paddingBottom: STICKY_H + insets.bottom + 24 }]}
+        keyboardShouldPersistTaps="handled"
+      >
+        {!editingId && (
+          <Pressable testID="form-import-pdf-button" onPress={importaPdf} disabled={importing} style={({ pressed }) => [styles.importCard, pressed && { opacity: 0.85 }]}>
+            {importing ? (
+              <ActivityIndicator color={colors.brandSecondary} size="large" />
+            ) : (
+              <MaterialDesignIcons name="file-pdf-box" size={40} color={colors.brandSecondary} />
+            )}
+            <View style={styles.flex}>
+              <Text style={styles.importTitle}>{importing ? "Lettura PDF in corso…" : "Importa da PDF"}</Text>
+              <Text style={styles.importSub}>
+                {importing ? "L'AI sta estraendo ordine e posizioni" : "Carica l'ordine di trasporto: i campi si compilano da soli"}
+              </Text>
+            </View>
+          </Pressable>
+        )}
+        {!!importInfo && (
+          <Animated.View entering={FadeInDown} style={styles.importInfo} testID="form-import-info">
+            <MaterialDesignIcons name="check-decagram" size={20} color={colors.onSuccessTint} />
+            <Text style={styles.importInfoText}>{importInfo}</Text>
+          </Animated.View>
+        )}
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Dati ordine</Text>
+          <View style={styles.orderBox}>
+            <Field label="NUMERO ORDINE *" highlight value={form.numeroOrdine} onChangeText={setF("numeroOrdine")} placeholder="es. 25023467" error={errors.numeroOrdine} testID="form-numero-ordine-input" autoCapitalize="characters" />
+          </View>
+          <Field label="Agenzia" value={form.agenzia} onChangeText={setF("agenzia")} placeholder="Chi ha ordinato" testID="form-agenzia-input" />
+          <Field label="Mittente *" value={form.mittente} onChangeText={setF("mittente")} placeholder="Chi spedisce" error={errors.mittente} testID="form-mittente-input" />
+          <Field
+            label="Data consegna *"
+            value={data}
+            onChangeText={setData}
+            placeholder="GG/MM/AAAA"
+            keyboardType="numbers-and-punctuation"
+            error={errors.data}
+            testID="form-data-input"
+          />
+          <View style={styles.quickDates}>
+            {[["Oggi", 0], ["Domani", 1], ["Dopodomani", 2]].map(([l, o]) => (
+              <Pressable key={l} onPress={() => setData(dayIt(o as number))} style={styles.qChip} testID={`form-data-${String(l).toLowerCase()}-chip`}>
+                <Text style={styles.qChipText}>{l}</Text>
+              </Pressable>
+            ))}
+          </View>
+          <Field label="Note" value={form.note} onChangeText={setF("note")} placeholder="Istruzioni speciali…" multiline testID="form-note-input" style={styles.noteInput} />
+        </View>
+
+        <View style={styles.card}>
+          <View style={styles.rowHead}>
+            <Text style={[styles.cardTitle, { color: colors.onSuccessTint }]}>
+              Pedane / Posizioni {rows.length > 1 ? `(${rows.length})` : ""}
+            </Text>
+          </View>
+          {!editingId && <Text style={styles.rowHint}>Stesso ordine, più pedane con posizione e destinazione diverse</Text>}
+          {rows.map((r, i) => {
+            const re = errors.rows?.[i];
+            const isDup = errors.internalDup?.includes(i);
+            return (
+              <Animated.View key={i} entering={FadeInDown.duration(200)} exiting={FadeOut} style={styles.rowCard} testID={`form-pedana-row-${i}`}>
+                <View style={styles.rowTop}>
+                  <Text style={styles.rowNum}>#{i + 1}</Text>
+                  {rows.length > 1 && (
+                    <IconButton icon="trash-can-outline" tone="danger" onPress={() => setRows((p) => p.filter((_, j) => j !== i))} testID={`form-pedana-remove-button-${i}`} />
+                  )}
+                </View>
+                <Field
+                  label="Posizione *"
+                  value={r.codice}
+                  onChangeText={(t) => setRow(i, "codice", t)}
+                  placeholder="es. 2619-019320-10000"
+                  error={re?.codice ?? (isDup ? "Posizione duplicata in questo modulo" : undefined)}
+                  testID={`form-pedana-codice-input-${i}`}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  style={styles.codeInput}
+                />
+                <Field label="Destinazione *" value={r.destinazione} onChangeText={(t) => setRow(i, "destinazione", t)} placeholder="Cliente / reparto / zona" error={re?.destinazione} testID={`form-pedana-destinazione-input-${i}`} />
+                <View style={styles.twoCol}>
+                  <View style={styles.flex}>
+                    <Field label="N° Colli" value={r.numeroColli} onChangeText={(t) => setRow(i, "numeroColli", t.replace(/[^0-9]/g, ""))} placeholder="es. 84" keyboardType="number-pad" testID={`form-pedana-colli-input-${i}`} />
+                  </View>
+                  <View style={styles.flex2}>
+                    <Field label="Mittente (se diverso)" value={r.mittente} onChangeText={(t) => setRow(i, "mittente", t)} placeholder="Facoltativo" testID={`form-pedana-mittente-input-${i}`} />
+                  </View>
+                </View>
+              </Animated.View>
+            );
+          })}
+          {!editingId && (
+            <Pressable onPress={() => setRows((p) => [...p, { ...emptyRow }])} style={styles.addRow} testID="form-add-pedana-button">
+              <MaterialDesignIcons name="plus-circle-outline" size={22} color={colors.onSuccessTint} />
+              <Text style={styles.addRowText}>Aggiungi un&apos;altra pedana</Text>
+            </Pressable>
+          )}
+        </View>
+      </KeyboardAwareScrollView>
+
+      <KeyboardStickyView offset={{ opened: insets.bottom }}>
+        <View style={[styles.sticky, { paddingBottom: insets.bottom + 12 }]}>
+          <Button
+            label={editingId ? "Salva modifiche" : rows.length > 1 ? `Registra ${rows.length} pedane` : "Registra ordine"}
+            icon="content-save-outline"
+            loading={saving}
+            onPress={handleSave}
+            testID="form-save-button"
+          />
+        </View>
+      </KeyboardStickyView>
+
+      <Sheet visible={!!dup} onClose={() => setDup(null)} testID="form-dup-sheet">
+        {dup && (
+          <View>
+            <View style={styles.dupHead}>
+              <MaterialDesignIcons name={dup.codiceMatches.length ? "alert" : "information-outline"} size={40} color={dup.codiceMatches.length ? colors.warning : colors.brandSecondary} />
+              <Text style={styles.dupTitle}>
+                {dup.codiceMatches.length
+                  ? dup.codiceMatches.length === 1
+                    ? "Posizione già registrata!"
+                    : `${dup.codiceMatches.length} posizioni già registrate!`
+                  : "Ordine già registrato"}
+              </Text>
+              <Text style={styles.dupSub}>
+                {dup.codiceMatches.length
+                  ? "Queste posizioni sono già assegnate ad altri ordini:"
+                  : `Il numero ordine "${form.numeroOrdine}" ha già ${dup.numeroMatches.length} pedan${dup.numeroMatches.length === 1 ? "a" : "e"}. Se è una nuova pedana dello stesso ordine, conferma.`}
+              </Text>
+            </View>
+            {(dup.codiceMatches.length ? dup.codiceMatches.map((m) => m.match) : dup.numeroMatches).map((m) => (
+              <View key={m.id} style={styles.dupItem} testID={`form-dup-item-${m.codice}`}>
+                <View style={styles.flex}>
+                  <Text style={styles.dupCode}>{m.codice}</Text>
+                  <Text style={styles.dupMeta} numberOfLines={2}>
+                    Ord. {m.numeroOrdine} · {m.mittente} → {m.destinazione}
+                  </Text>
+                </View>
+                <IconButton
+                  icon="pencil-outline"
+                  onPress={() => {
+                    setDup(null);
+                    router.replace({ pathname: "/ufficio/form", params: { id: m.id } });
+                  }}
+                  testID={`form-dup-edit-button-${m.codice}`}
+                />
+              </View>
+            ))}
+            <View style={styles.dupBtns}>
+              <Button
+                label={dup.codiceMatches.length ? "Registra comunque" : "Conferma nuova pedana"}
+                variant={dup.codiceMatches.length ? "warning" : "success"}
+                icon="check"
+                loading={saving}
+                onPress={doSave}
+                testID="form-dup-confirm-button"
+              />
+              <Button label="Annulla, correggo" variant="secondary" onPress={() => setDup(null)} testID="form-dup-cancel-button" />
+            </View>
+          </View>
+        )}
+      </Sheet>
+    </View>
+  );
+}
+
+const useStyles = makeStyles((c) => ({
+  root: { flex: 1, backgroundColor: c.surface },
+  center: { alignItems: "center", justifyContent: "center" },
+  flex: { flex: 1 },
+  flex2: { flex: 2 },
+  header: { backgroundColor: c.brandPrimary, paddingHorizontal: 16, paddingBottom: 12, flexDirection: "row", alignItems: "center", gap: 12 },
+  headerTitle: { fontFamily: fonts.display, fontSize: 26, color: c.onBrandPrimary },
+  content: { padding: 16, gap: 14 },
+  importCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    minHeight: 84,
+    padding: 16,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderStyle: "dashed",
+    borderColor: c.brandSecondary,
+    backgroundColor: c.brandTertiary,
+  },
+  importTitle: { fontFamily: fonts.textBold, fontSize: 17, color: c.brandPrimary },
+  importSub: { fontFamily: fonts.text, fontSize: 13, color: c.onSurfaceTertiary },
+  importInfo: { flexDirection: "row", gap: 8, backgroundColor: c.successTint, borderRadius: 10, padding: 12, alignItems: "center" },
+  importInfoText: { flex: 1, fontFamily: fonts.textMedium, fontSize: 13, color: c.onSuccessTint },
+  card: { backgroundColor: c.surfaceSecondary, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: c.border },
+  cardTitle: { fontFamily: fonts.display, fontSize: 22, color: c.brandPrimary, marginBottom: 12 },
+  orderBox: { backgroundColor: c.brandTertiary, borderRadius: 10, padding: 12, paddingBottom: 0, marginBottom: 14 },
+  quickDates: { flexDirection: "row", gap: 8, marginTop: -6, marginBottom: 14 },
+  qChip: { height: 36, paddingHorizontal: 14, borderRadius: 999, backgroundColor: c.surfaceTertiary, justifyContent: "center", flexShrink: 0 },
+  qChipText: { fontFamily: fonts.textSemi, fontSize: 13, color: c.onSurfaceTertiary },
+  noteInput: { minHeight: 72, paddingTop: 12, textAlignVertical: "top" },
+  rowHead: { flexDirection: "row", alignItems: "center" },
+  rowHint: { fontFamily: fonts.text, fontSize: 12, color: c.muted, marginTop: -8, marginBottom: 12 },
+  rowCard: { backgroundColor: c.surfaceTertiary, borderRadius: 12, padding: 12, paddingBottom: 0, marginBottom: 10, borderWidth: 1, borderColor: c.border },
+  rowTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8, minHeight: 44 },
+  rowNum: { fontFamily: fonts.display, fontSize: 20, color: c.onSuccessTint },
+  codeInput: { fontFamily: fonts.display, fontSize: 22 },
+  twoCol: { flexDirection: "row", gap: 10 },
+  addRow: {
+    minHeight: 56,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderStyle: "dashed",
+    borderColor: c.success,
+    backgroundColor: c.successTint,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  addRowText: { fontFamily: fonts.textBold, fontSize: 15, color: c.onSuccessTint },
+  sticky: { backgroundColor: c.surfaceSecondary, paddingHorizontal: 16, paddingTop: 12, borderTopWidth: 1, borderTopColor: c.border },
+  dupHead: { alignItems: "center", gap: 6, marginBottom: 14 },
+  dupTitle: { fontFamily: fonts.textBold, fontSize: 19, color: c.onSurface, textAlign: "center" },
+  dupSub: { fontFamily: fonts.text, fontSize: 14, color: c.onSurfaceTertiary, textAlign: "center" },
+  dupItem: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: c.warningTint, borderRadius: 10, padding: 12, marginBottom: 8 },
+  dupCode: { fontFamily: fonts.display, fontSize: 20, color: c.onWarningTint },
+  dupMeta: { fontFamily: fonts.text, fontSize: 13, color: c.onSurfaceSecondary },
+  dupBtns: { gap: 10, marginTop: 8 },
+}));

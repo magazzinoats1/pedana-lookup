@@ -1,0 +1,147 @@
+{
+  "app_name": "pedanalookup",
+  "personality": "7 Dark-First Utility DARK",
+  "personality_one_liner": "A high-contrast, fast-scanning operational surface for cold storage environments, where utility and readability are the only things that matter.",
+  "color": {
+    "surface": "#121212",
+    "onSurface": "#F5F5F5",
+    "surfaceSecondary": "#1E1E1E",
+    "onSurfaceSecondary": "#E0E0E0",
+    "surfaceTertiary": "#2C2C2C",
+    "onSurfaceTertiary": "#CCCCCC",
+    "surfaceInverse": "#F5F5F5",
+    "onSurfaceInverse": "#121212",
+    "brand": "#FF6D00",
+    "brandPrimary": "#FF6D00",
+    "onBrandPrimary": "#121212",
+    "brandSecondary": "#FFA000",
+    "onBrandSecondary": "#121212",
+    "brandTertiary": "#4E2A0E",
+    "onBrandTertiary": "#FFA000",
+    "success": "#00E676",
+    "onSuccess": "#00331A",
+    "warning": "#FFEA00",
+    "onWarning": "#332F00",
+    "error": "#FF1744",
+    "onError": "#4D000F",
+    "info": "#29B6F6",
+    "onInfo": "#002B3D",
+    "border": "#333333",
+    "borderStrong": "#4D4D4D",
+    "divider": "#2C2C2C",
+    "muted": "#9E9E9E",
+    "onBrand": "#121212"
+  },
+  "typography": {
+    "displayFontFamily": "Barlow Condensed",
+    "textFontFamily": "IBM Plex Sans",
+    "scale": {
+      "sm": 12,
+      "base": 14,
+      "lg": 16,
+      "xl": 20,
+      "2xl": 24
+    }
+  },
+  "spacing": {
+    "rule": "Use tight, operational spacing to maximize data density while keeping touch targets large enough for gloved interaction (min 56pt height).",
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 24,
+    "2xl": 32,
+    "3xl": 48
+  },
+  "radius_tokens": {
+    "sm": 6,
+    "md": 12,
+    "lg": 20,
+    "pill": 999
+  },
+  "shadow_tier": 0,
+  "navigation": "bottom_tabs",
+  "icon_set": "Phosphor",
+  "glassmorphism": {
+    "enabled": false,
+    "do's": [
+      "Keep surfaces solid for maximum contrast and legibility in variable lighting."
+    ],
+    "dont's": [
+      "Do not use blur or glassmorphism. This is a fast-response utility app."
+    ]
+  },
+  "platform_libraries": {
+    "glass": {
+      "ios": "expo-blur",
+      "android": "solid surfaceSecondary",
+      "low_end_android_fallback": "solid surfaceSecondary"
+    },
+    "image": "expo-image",
+    "blur": "expo-blur",
+    "bottom_sheet": "@gorhom/bottom-sheet",
+    "animation": "react-native-reanimated",
+    "gesture": "react-native-gesture-handler"
+  },
+  "screens": [
+    {
+      "name": "Search (Cerca)",
+      "purpose": "Primary scanner/search screen to instantly look up a pallet by its position number.",
+      "states": {
+        "loading": "Spinner in the center of the results area.",
+        "empty": "Empty state illustration with text 'Nessuna pedana trovata' (No pallet found).",
+        "error": "Red error text 'Errore di ricerca' with retry button."
+      },
+      "layout": "Top half is a massive, high-contrast search input focused by default for barcode scanner or keyboard input. The input should use oversized condensed typography. Below the input, display instant search results as stacked, high-contrast cards. If a single exact match is found, auto-navigate to the detail screen."
+    },
+    {
+      "name": "Position Detail (Dettaglio Pedana)",
+      "purpose": "Displays critical pallet routing information clearly for a worker in motion.",
+      "states": {
+        "loading": "Skeleton of the data points.",
+        "empty": "N/A - Reached only with data.",
+        "error": "Red error text with back button."
+      },
+      "layout": "Destination name (e.g. 'Thekla Göpel GmbH') dominates the top in oversized condensed font. Below it, a segmented grid of metrics: Supplier, Order Number, Product, Colli, Temperature (2-6°C). Use strong divider lines between data points. Primary sticky CTA at bottom: 'Chiudi' or 'Conferma'."
+    },
+    {
+      "name": "Orders List (Ordini)",
+      "purpose": "Shows all imported transport orders and their associated positions.",
+      "states": {
+        "loading": "Skeleton list.",
+        "empty": "Empty box illustration with text 'Nessun ordine presente' (No orders present).",
+        "error": "Error text with retry button."
+      },
+      "layout": "List items grouped by Transport Order. Each header shows the order number (e.g. '25023467'). Tapping an order expands to show its positions. Swipe-to-delete on orders/positions. High-contrast labels for position codes."
+    },
+    {
+      "name": "Data Entry (Aggiungi)",
+      "purpose": "Allows importing orders via PDF or entering positions manually.",
+      "states": {
+        "loading": "Processing AI parsing with progress indicator.",
+        "empty": "N/A",
+        "error": "Parsing error message with retry."
+      },
+      "layout": "Two massive touch-friendly blocks. Block 1: 'Importa da PDF' (triggers file picker and Gemini AI parse). Block 2: 'Aggiungi Manualmente' (opens a strict, single-column form with large inputs for Position, Destination, Supplier, Product, Colli). Sticky submit button at the bottom."
+    }
+  ],
+  "images": {
+    "warehouse_hero_bg": {
+      "url": "https://images.unsplash.com/photo-1721937127582-ed331de95a04?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDN8MHwxfHNlYXJjaHwyfHx3YXJlaG91c2UlMjBhaXNsZSUyMGRhcmt8ZW58MHx8fHwxNzkxOTcwMTA1fDA&ixlib=rb-4.1.0&q=85",
+      "alt": "Dark warehouse aisle with wrapped pallets"
+    },
+    "empty_box": {
+      "url": "https://images.unsplash.com/photo-1575833948662-cc99178abbb8?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzR8MHwxfHNlYXJjaHwxfHxlbXB0eSUyMGNhcmRib2FyZCUyMGJveCUyMGRhcmslMjBiYWNrZ3JvdW5kfGVufDB8fHx8MTc5MTk3MDExMHww&ixlib=rb-4.1.0&q=85",
+      "alt": "Empty cardboard box"
+    }
+  },
+  "instructions_to_main_agent": [
+    "Use Personality 7 (Dark-First Utility DARK). Stick strictly to the provided color palette. Do NOT use any blue, purple, or indigo.",
+    "The app is for warehouse workers in a cold environment. Touch targets MUST be massive (min 56pt, preferably 64pt for key actions) to accommodate gloved interaction.",
+    "Typography: Use 'Barlow Condensed' for metrics, destinations, and position codes (oversized, e.g., 32pt - 48pt). Use 'IBM Plex Sans' for readable labels.",
+    "Layout: Focus on high contrast and instant scanability. Use sharp edges (sm radius) and thick dividers rather than soft shadows or blur.",
+    "For the suppliers (Orchidea frutta, Antolini, etc.), use the fallback initials avatar in a brandTertiary square (e.g., 'OF', 'AN', 'MG') since specific logos were not found.",
+    "All UI strings should ideally be in Italian as requested by the user.",
+    "Always apply a top-to-bottom dark gradient scrim over the warehouse_hero_bg if text is overlaid on it."
+  ]
+}
