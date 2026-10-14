@@ -14,6 +14,7 @@ User uploaded a KÖLLA transport-order PDF and a reference web app (GestioneLogi
 - Warehouse search exact→partial, detail with big destination, arrival status attesa/parziale(note)/completo with timestamps
 - AI PDF import tested on sample (6 pedane, order 25023467)
 - Start screen changed to white background (user request)
+- Drag & drop PDF import on web (drop anywhere on Nuovo Ordine screen); AI prompt tightened so mittente is company name only
 
 ## Backlog
 - P1: Barcode/label scan for positions (camera)

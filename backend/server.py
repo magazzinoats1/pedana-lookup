@@ -313,11 +313,11 @@ Rispondi SOLO con JSON valido, senza testo extra, con questa struttura esatta:
 {
   "numeroOrdine": "numero dell'ordine di trasporto (es. 25023467)",
   "agenzia": "azienda che ha emesso/commissionato l'ordine (es. KÖLLA GmbH & Co. KG)",
-  "mittente": "fornitore/luogo di carico principale (se più di uno, il primo)",
+  "mittente": "SOLO il nome dell'azienda fornitrice/luogo di carico principale, senza indirizzo (se più di uno, il primo)",
   "dataConsegna": "data di scarico/consegna in formato YYYY-MM-DD",
   "note": "istruzioni importanti brevi (temperatura, avvisi), max 200 caratteri",
   "pedane": [
-    {"codice": "codice posizione completo (es. 2619-019320-10000)", "destinazione": "nome destinatario + città (luogo di scarico)", "numeroColli": "numero colli come intero senza decimali", "mittente": "fornitore di questa posizione"}
+    {"codice": "codice posizione completo (es. 2619-019320-10000)", "destinazione": "nome destinatario + città (luogo di scarico)", "numeroColli": "numero colli come intero senza decimali", "mittente": "SOLO il nome dell'azienda fornitrice di questa posizione, senza indirizzo"}
   ]
 }
 Includi OGNI riga/posizione presente nel documento. Se un dato manca usa stringa vuota."""

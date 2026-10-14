@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Platform, Pressable, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as DocumentPicker from "expo-document-picker";
@@ -55,6 +55,7 @@ export default function OrdineFormScreen() {
   const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importInfo, setImportInfo] = useState("");
+  const [dragging, setDragging] = useState(false);
   const [dup, setDup] = useState<DupResult | null>(null);
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -74,6 +75,56 @@ export default function OrdineFormScreen() {
       .finally(() => setLoading(false));
   }, [editingId, toast]);
 
+  // Web: drag & drop a PDF anywhere on the screen to import it
+  const uploadRef = useRef<(fd: FormData, name: string) => Promise<void>>(async () => {});
+  uploadRef.current = uploadPdf;
+  useEffect(() => {
+    if (Platform.OS !== "web" || editingId || typeof document === "undefined") return;
+    let depth = 0;
+    const hasFiles = (e: DragEvent) => !!e.dataTransfer && Array.from(e.dataTransfer.types || []).includes("Files");
+    const onEnter = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      depth += 1;
+      setDragging(true);
+    };
+    const onOver = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+    };
+    const onLeave = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      depth = Math.max(0, depth - 1);
+      if (depth === 0) setDragging(false);
+    };
+    const onDrop = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      depth = 0;
+      setDragging(false);
+      const file = e.dataTransfer?.files?.[0];
+      if (!file) return;
+      if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+        toast("Trascina un file PDF", "error");
+        return;
+      }
+      const fd = new FormData();
+      fd.append("file", file);
+      uploadRef.current(fd, file.name);
+    };
+    document.addEventListener("dragenter", onEnter);
+    document.addEventListener("dragover", onOver);
+    document.addEventListener("dragleave", onLeave);
+    document.addEventListener("drop", onDrop);
+    return () => {
+      document.removeEventListener("dragenter", onEnter);
+      document.removeEventListener("dragover", onOver);
+      document.removeEventListener("dragleave", onLeave);
+      document.removeEventListener("drop", onDrop);
+    };
+  }, [editingId, toast]);
+
   const setF = (k: keyof typeof emptyForm) => (t: string) => setForm((f) => ({ ...f, [k]: t }));
   const setRow = (i: number, k: keyof PedanaRow, v: string) => setRows((p) => p.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
 
@@ -84,6 +135,11 @@ export default function OrdineFormScreen() {
     const fd = new FormData();
     if (Platform.OS === "web" && a.file) fd.append("file", a.file);
     else fd.append("file", { uri: a.uri, name: a.name || "ordine.pdf", type: "application/pdf" } as any);
+    await uploadPdf(fd, a.name || "ordine.pdf");
+  }
+
+  async function uploadPdf(fd: FormData, name: string) {
+    const a = { name };
     setImporting(true);
     setImportInfo("");
     try {
@@ -200,16 +256,22 @@ export default function OrdineFormScreen() {
         keyboardShouldPersistTaps="handled"
       >
         {!editingId && (
-          <Pressable testID="form-import-pdf-button" onPress={importaPdf} disabled={importing} style={({ pressed }) => [styles.importCard, pressed && { opacity: 0.85 }]}>
+          <Pressable testID="form-import-pdf-button" onPress={importaPdf} disabled={importing} style={({ pressed }) => [styles.importCard, dragging && styles.importCardDrag, pressed && { opacity: 0.85 }]}>
             {importing ? (
               <ActivityIndicator color={colors.brandSecondary} size="large" />
             ) : (
-              <MaterialDesignIcons name="file-pdf-box" size={40} color={colors.brandSecondary} />
+              <MaterialDesignIcons name={dragging ? "tray-arrow-down" : "file-pdf-box"} size={40} color={dragging ? colors.onBrandSecondary : colors.brandSecondary} />
             )}
             <View style={styles.flex}>
-              <Text style={styles.importTitle}>{importing ? "Lettura PDF in corso…" : "Importa da PDF"}</Text>
-              <Text style={styles.importSub}>
-                {importing ? "L'AI sta estraendo ordine e posizioni" : "Carica l'ordine di trasporto: i campi si compilano da soli"}
+              <Text style={[styles.importTitle, dragging && { color: colors.onBrandSecondary }]}>
+                {importing ? "Lettura PDF in corso…" : dragging ? "Rilascia qui il PDF" : "Importa da PDF"}
+              </Text>
+              <Text style={[styles.importSub, dragging && { color: colors.onBrandSecondary }]}>
+                {importing
+                  ? "L'AI sta estraendo ordine e posizioni"
+                  : Platform.OS === "web"
+                    ? "Tocca per scegliere o trascina qui il PDF: i campi si compilano da soli"
+                    : "Carica l'ordine di trasporto: i campi si compilano da soli"}
               </Text>
             </View>
           </Pressable>
@@ -383,6 +445,7 @@ const useStyles = makeStyles((c) => ({
     borderColor: c.brandSecondary,
     backgroundColor: c.brandTertiary,
   },
+  importCardDrag: { backgroundColor: c.brandSecondary, borderStyle: "solid", minHeight: 120 },
   importTitle: { fontFamily: fonts.textBold, fontSize: 17, color: c.brandPrimary },
   importSub: { fontFamily: fonts.text, fontSize: 13, color: c.onSurfaceTertiary },
   importInfo: { flexDirection: "row", gap: 8, backgroundColor: c.successTint, borderRadius: 10, padding: 12, alignItems: "center" },
