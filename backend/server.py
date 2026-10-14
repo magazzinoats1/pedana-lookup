@@ -224,6 +224,12 @@ async def cerca(q: str = ""):
     return [Pedana.from_mongo(d) for d in docs]
 
 
+@api.get("/pedane/tutte", response_model=List[Pedana])
+async def tutte():
+    docs = await db.pedane.find({}).sort([("dataConsegna", -1), ("createdAt", -1)]).to_list(1000)
+    return [Pedana.from_mongo(d) for d in docs]
+
+
 @api.get("/pedane/{pid}", response_model=Pedana)
 async def get_pedana(pid: str):
     doc = await db.pedane.find_one({"id": pid})

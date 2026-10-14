@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialDesignIcons } from "@react-native-vector-icons/material-design-icons";
 
-import { api, Pedana } from "@/src/api";
+import { api, formatDate, Pedana } from "@/src/api";
 import { AppHeader } from "@/src/components/AppHeader";
 import { PedanaDetail, statoColor } from "@/src/components/PedanaDetail";
 import { Button, IconButton } from "@/src/components/ui";
@@ -16,6 +16,7 @@ export default function Magazzino() {
   const [results, setResults] = useState<Pedana[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [coop, setCoop] = useState("");
   const reqId = useRef(0);
@@ -30,32 +31,29 @@ export default function Magazzino() {
 
   async function search(text: string) {
     const id = ++reqId.current;
-    if (!text.trim()) {
-      setResults([]);
-      setLoading(false);
-      setError("");
-      return;
-    }
     setLoading(true);
     setError("");
     try {
-      const r = await api<Pedana[]>(`/pedane/cerca?q=${encodeURIComponent(text.trim())}`);
+      const r = await api<Pedana[]>(text.trim() ? `/pedane/cerca?q=${encodeURIComponent(text.trim())}` : "/pedane/tutte");
       if (id !== reqId.current) return;
       setResults(r);
     } catch (e: any) {
       if (id === reqId.current) setError(e.message);
     } finally {
-      if (id === reqId.current) setLoading(false);
+      if (id === reqId.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }
 
   useEffect(() => {
     setSelectedId(null);
-    const t = setTimeout(() => search(q), 300);
+    const t = setTimeout(() => search(q), q ? 300 : 0);
     return () => clearTimeout(t);
   }, [q]);
 
-  const selected = results.length === 1 ? results[0] : results.find((r) => r.id === selectedId) ?? null;
+  const selected = q.trim() && results.length === 1 ? results[0] : results.find((r) => r.id === selectedId) ?? null;
   const onUpdated = (p: Pedana) => setResults((rs) => rs.map((r) => (r.id === p.id ? p : r)));
 
   return (
@@ -95,6 +93,7 @@ export default function Magazzino() {
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); search(q); }} tintColor={colors.brandSecondary} />}
       >
         {loading && results.length === 0 ? (
           <ActivityIndicator size="large" color={colors.brandSecondary} style={styles.loader} testID="magazzino-loading" />
@@ -105,10 +104,11 @@ export default function Magazzino() {
             <Text style={styles.emptySub}>{error}</Text>
             <Button label="Riprova" icon="refresh" variant="ghost" onPress={() => search(q)} testID="magazzino-retry-button" />
           </View>
-        ) : !q.trim() ? (
+        ) : !q.trim() && results.length === 0 ? (
           <View style={styles.empty} testID="magazzino-empty-start">
             <MaterialDesignIcons name="package-variant" size={72} color={colors.borderStrong} />
-            <Text style={styles.emptySub}>Scrivi la posizione pedana o il numero ordine</Text>
+            <Text style={styles.emptyTitle}>Nessuna merce registrata</Text>
+            <Text style={styles.emptySub}>Le pedane registrate dall&apos;ufficio appariranno qui</Text>
           </View>
         ) : results.length === 0 ? (
           <View style={styles.empty} testID="magazzino-no-results">
@@ -121,14 +121,16 @@ export default function Magazzino() {
             {results.length > 1 && (
               <Pressable onPress={() => setSelectedId(null)} style={styles.backRow} testID="magazzino-back-to-results-button">
                 <MaterialDesignIcons name="arrow-left" size={22} color={colors.brandSecondary} />
-                <Text style={styles.backText}>Torna ai {results.length} risultati</Text>
+                <Text style={styles.backText}>{q.trim() ? `Torna ai ${results.length} risultati` : "Torna alla lista merce"}</Text>
               </Pressable>
             )}
             <PedanaDetail key={selected.id} pedana={selected} onUpdated={onUpdated} />
           </View>
         ) : (
           <View style={styles.gap}>
-            <Text style={styles.count} testID="magazzino-results-count">{results.length} pedane trovate</Text>
+            <Text style={styles.count} testID="magazzino-results-count">
+              {q.trim() ? `${results.length} pedane trovate` : `Tutta la merce registrata · ${results.length} pedane`}
+            </Text>
             {results.map((p, i) => (
               <Animated.View key={p.id} entering={FadeInDown.delay(i * 40).duration(220)}>
                 <Pressable
@@ -142,7 +144,7 @@ export default function Magazzino() {
                     {!!p.merce && <Text style={styles.resMerce} numberOfLines={1}>{p.merce}</Text>}
                     <Text style={styles.resMeta} numberOfLines={1}>
                       Ord. {p.numeroOrdine} · {p.mittente}
-                      {p.numeroColli ? ` · ${p.numeroColli} colli` : ""}
+                      {p.numeroColli ? ` · ${p.numeroColli} colli` : ""} · {formatDate(p.dataConsegna)}
                     </Text>
                   </View>
                   <MaterialDesignIcons name="chevron-right" size={30} color={colors.muted} />

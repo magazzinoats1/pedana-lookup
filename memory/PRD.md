@@ -17,6 +17,7 @@ User uploaded a KÖLLA transport-order PDF and a reference web app (GestioneLogi
 - Drag & drop PDF import on web (drop anywhere on Nuovo Ordine screen); AI prompt tightened so mittente is company name only
 - Mittente moved from order data to each pedana row (required). PDF import now uses the short position code printed below (e.g. 2619-019320) and the supplier name on the right (ORCHIDEA, BERTOLI FRUIT, MORANDO GRAZIANO); each PDF row becomes its own pedana
 - Same posizione allowed on multiple pedane (no blocking); new per-pedana field 'Tipo merce' (form, list, magazzino results/detail, search, PDF import)
+- Magazzino 'Cerca Pedana' shows the full list of all registered pedane/merce when the search is empty (GET /api/pedane/tutte, pull-to-refresh)
 - Security audit run: SEC-001 default office password (change it), SEC-002 wildcard CORS, hardening: login rate limit, PDF size cap
 
 ## Backlog
