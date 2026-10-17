@@ -8,7 +8,6 @@ const isoLocal = (d: Date) =>
 
 export function inRitardo(p: Pedana, now = new Date()) {
   if (p.statoArrivo !== "attesa" || !p.dataConsegna) return false;
-  const oggi = isoLocal(now);
-  if (p.dataConsegna < oggi) return true;
-  return p.dataConsegna === oggi && now.getHours() >= ORA_RITARDO;
+  // Only pallets due TODAY are highlighted (past days are not)
+  return p.dataConsegna === isoLocal(now) && now.getHours() >= ORA_RITARDO;
 }

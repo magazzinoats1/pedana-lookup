@@ -1,0 +1,27 @@
+{
+  "summary": "Verified bug-fix: 'In ritardo' highlight now applies ONLY to pedane with dataConsegna == today (local) + statoArrivo attesa + local hour >= 14. Past-day pedane are no longer flagged. All 3 phases pass. Used page.clock.install(time=...) to simulate TODAY@15:00 and TODAY@10:00; created TEST pedane via POST /api/pedane (ufficio Bearer) and deleted after test. No real data modified.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "Playwright inline scripts executed via mcp_browser_automation (3 runs)",
+    "Screenshots: /tmp/mag_10.png, /tmp/rie_today.jpg, /tmp/rie_yday3.jpg"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "ritardi.ts (lines 9-13): correct — returns false unless p.dataConsegna === isoLocal(now) AND now.getHours() >= 14. Local ISO (not UTC) avoids TZ off-by-one.",
+    "Magazzino & Riepilogo both consume inRitardo() → single source of truth. Good.",
+    "Banner subtext in magazzino.tsx line 313 reads 'Previste per oggi e non ancora arrivate dopo le 14:00' — matches spec."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "Each test run: created 1 TEST pedana for yesterday (TEST-R15*-Y) and 1 for today (TEST-R15*-T) via POST /api/pedane, then DELETE both (200) at the end. 6 pedane across 3 runs, all cleaned up.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Clock simulation details: Playwright's page.clock.install(time='YYYY-MM-DDTHH:MM:SS') freezes Date/Date.now for the page. page.clock has no .uninstall() — use a new context/page for a different simulated time. React Native Pressable in Expo web may not fire from Playwright click(force=True) in some flows; fallback used: dispatch pointerdown+pointerup+click via page.evaluate. Observed baselines (Oct 17, 2026, 15:00 simulated): magazzino total late = 7, riepilogo today late = 7, riepilogo yesterday late = 0 (correct per new spec). Real DB has stale 'attesa' rows for today; those are legitimately flagged after 14:00.",
+  "rca_of_issue": "N/A — change implemented correctly. Phase A (today 15:00): banner visible, 'N pedane in ritardo' count correct, today-TEST pill present, yesterday-TEST pill ABSENT, yesterday row shows normal 'In attesa'. Phase B (today 10:00): no banner, no pills (hour < 14). Phase C (riepilogo): today@15:00 → stat=7 and today-TEST pill present; yesterday page → stat=0 and zero riepilogo-ritardo-* rows."
+}

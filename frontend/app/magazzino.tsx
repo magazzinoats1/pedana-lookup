@@ -310,7 +310,7 @@ export default function Magazzino() {
                     <Text style={styles.lateTitle} testID="magazzino-ritardi-count">
                       {late.length} pedan{late.length === 1 ? "a" : "e"} in ritardo
                     </Text>
-                    <Text style={styles.lateSub}>Previste per oggi (dopo le {ORA_RITARDO}:00) o giorni passati e non ancora arrivate</Text>
+                    <Text style={styles.lateSub}>Previste per oggi e non ancora arrivate dopo le {ORA_RITARDO}:00</Text>
                   </View>
                 </View>
               );
