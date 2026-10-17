@@ -601,6 +601,67 @@ async def import_pdf(file: UploadFile = File(...), _=Depends(require_ufficio)):
     }
 
 
+LABEL_PROMPT = """Questa è la foto di un cartello/etichetta di una pedana in un magazzino logistico.
+I cartelli sono diversi tra loro e il codice è spesso SCRITTO A MANO (anche in un campo qualsiasi, es. "Prodotto - varietà").
+Leggi con attenzione la scrittura a mano: una "q" o "g" in mezzo a cifre è un 9, "l" o "|" è un 1, "O" è uno 0, "S" può essere 5, "Z" può essere 2; punti, virgole o spazi tra i gruppi di cifre sono un trattino.
+Ignora numeri di telefono, fax, partita IVA, CAP e indirizzi prestampati.
+Individua i codici utili per trovare la pedana:
+- codici posizione nel formato NNNN-NNNNNN (es. 2619-019320) oppure lunghi come 2619-019320-10000 o A2619-023221-10000
+- numeri ordine di trasporto di 8 cifre (es. 25023467)
+Rispondi SOLO con JSON: {"codici": ["..."], "ordini": ["..."], "testo": "testo letto, max 300 caratteri"}
+Se non trovi nulla usa liste vuote."""
+
+MAX_IMG = 8 * 1024 * 1024
+
+
+@api.post("/scan-etichetta")
+async def scan_etichetta(file: UploadFile = File(...)):
+    data = await file.read()
+    if len(data) > MAX_IMG:
+        raise HTTPException(status_code=413, detail="Foto troppo grande")
+    mime = file.content_type if (file.content_type or "").startswith("image/") else "image/jpeg"
+    suffix = ".png" if mime == "image/png" else ".jpg"
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+        tmp.write(data)
+        path = tmp.name
+    try:
+        chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=f"label-{uuid.uuid4()}",
+                       system_message="Leggi etichette logistiche. Rispondi solo in JSON.") \
+            .with_model("gemini", "gemini-3-flash-preview")
+        out = ""
+        async for ev in chat.stream_message(UserMessage(
+                text=LABEL_PROMPT, file_contents=[FileContentWithMimeType(file_path=path, mime_type=mime)])):
+            if isinstance(ev, TextDelta):
+                out += ev.content
+            elif isinstance(ev, StreamDone):
+                break
+        parsed = extract_json(out)
+    except Exception as e:
+        logger.exception("Label scan failed")
+        raise HTTPException(status_code=502, detail=f"Lettura etichetta non riuscita: {str(e)[:120]}")
+    finally:
+        os.unlink(path)
+    candidati: List[str] = []
+    for c in (parsed.get("codici") or []):
+        c = str(c).strip().upper().replace(" ", "")
+        m = re.search(r"(\d{4}-\d{6})", c)
+        for v in ([m.group(1)] if m else []) + [c]:
+            if v and v not in candidati:
+                candidati.append(v)
+    for o in (parsed.get("ordini") or []):
+        o = re.sub(r"\D", "", str(o))
+        if len(o) >= 6 and o not in candidati:
+            candidati.append(o)
+    # Prefer candidates that exist in the database
+    trovati = []
+    for c in candidati:
+        exact = {"$regex": f"^{re.escape(c)}$", "$options": "i"}
+        n = await db.pedane.count_documents({"$or": [{"codice": exact}, {"numeroOrdine": exact}], **ACTIVE})
+        trovati.append({"codice": c, "pedane": n})
+    trovati.sort(key=lambda x: -x["pedane"])
+    return {"candidati": trovati, "testo": str(parsed.get("testo", ""))[:300]}
+
+
 @api.get("/")
 async def root():
     return {"message": "Gestione Logistica API"}

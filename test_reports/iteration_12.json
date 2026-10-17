@@ -1,0 +1,33 @@
+{
+  "summary": "Iteration 11 UI fix VERIFIED on /magazzino at 390x844. document.documentElement.scrollWidth == window.innerWidth (390 == 390) — no horizontal overflow. magazzino-search-input bbox (empty) x=68 right=306 w=238; magazzino-scan-button bbox x=314 right=366 w=52 — all inside viewport. After typing '2619': clear button bbox x=272 right=306 and scan button right=366 — all inside viewport (<=390). Chip rows render below the search box: magazzino-date-filter-tutte at y=238, magazzino-filter-tutte at y=289. Scan flow regression PASSED end-to-end: tap magazzino-scan-button → web file chooser opens directly (no permission sheet path needed), set_files(sample_label.webp from provided URL) → after ~12s wait, magazzino-search-input.value == '2619-019331' and exactly 2 result cards appear (Ord. 25023487 with the two 2619-019331 pedane for Peter Brozulat GmbH → IL GALLETTO SOC. CON, 84 colli each). styles.input minWidth:0 + fontSize 26 fix is effective. No new regressions observed.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "/magazzino",
+        "issues": [
+          "Non-blocking: console warning from RN Web still present: 'props.pointerEvents is deprecated. Use style.pointerEvents'. Not caused by this iteration; unrelated to magazzino.tsx (likely inside Sheet/Overlay internal to a dep). Low priority."
+        ]
+      }
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_scan_etichetta.py",
+    "/app/test_reports/pytest/pytest_scan_etichetta.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "magazzino.tsx:540 styles.input now has {flex:1, minWidth:0, fontSize:26} — correct RN Web shrink fix. fontSize reduced from 30 → 26 keeps readability (still large enough for the handwritten position codes).",
+    "No other changes required; scan flow and chip rows unaffected."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (iter11 5/5 scan tests, not rerun this iter per request)", "frontend": "100% — overflow fixed, scan flow + chips verified"},
+  "seed_data_creation": "None. Read-only test against real pedane for position 2619-019331 (order 25023487, 2 pedane, Peter Brozulat GmbH / IL GALLETTO SOC. CON).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Public URL EXPO_PUBLIC_BACKEND_URL=https://pedana-lookup.preview.emergentagent.com. Scan sample at https://customer-assets-0z36b82j.emergentagent.net/job_pedana-lookup/artifacts/04a42fbd6dd68c3d_37d10869-0ec6-470f-bec9-80dbe0a51415.webp returns codice '2619-019331' (2 pedane) in ~5-12s via Gemini. On web, magazzino-scan-button triggers the browser file chooser directly without the scan-permission-sheet; use page.expect_file_chooser() before clicking. Magazzino search bar overflow issue (iter11 HIGH) is RESOLVED by styles.input minWidth:0 + fontSize 26.",
+  "rca_of_issue": "Iter11 overflow RCA (now mitigated): on RN Web a flex child's default min-width is 'auto' (content-based), so a TextInput with fontSize 30 + long placeholder had intrinsic width ~360px and would not shrink inside the inputWrap row (icon+input+clear+scan + padding ≈ 456px) at viewport 390. Fix in /app/frontend/app/magazzino.tsx:540 adds minWidth:0 to styles.input and lowers fontSize to 26. Verified: at 390x844 docScrollW=390, input w=238 (empty) / 196 (typed), scan right=366 ≤ 390."
+}

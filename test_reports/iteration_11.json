@@ -1,0 +1,46 @@
+{
+  "summary": "Tested new 'Scansione Etichette' feature (handwritten label scan via POST /api/scan-etichetta). Backend 5/5 pytest passed; Gemini 3 Flash consistently reads the real handwritten webp (3/3 attempts) returning candidati containing {codice:'2619-019331', pedane>=1}; >8MB upload returns 413; blank image returns candidati [] without crash. Frontend scan flow works end-to-end on web at 390x844: tap magazzino-scan-button → (permission sheet) → scan-allow-camera-button → file chooser → scan-reading-overlay 'Lettura etichetta…' → magazzino-search-input value becomes '2619-019331' and the 2 real Peter Brozulat GmbH pedane for order 25023487 are listed, with toast 'Letto: 2619-019331'. ONE UI ISSUE FOUND: horizontal overflow of the search bar at 390x844 — document.scrollWidth=488 while viewport=390, so the magazzino-scan-button renders at x=398 (right edge 450), 60px outside the viewport. The TextInput's intrinsic content width (fontSize 30, placeholder 'Posizione o N° ordine') prevents it from shrinking below ~360px, pushing the scan button off-screen on narrow mobile viewports. The input, clear button and scan button do NOT all fit at 390x844 as required by the test spec.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "Magazzino search bar (inputWrap)",
+        "issue": "Horizontal overflow at 390x844: document.scrollWidth=488 while viewport is 390. magazzino-scan-button is positioned at x=398 (right edge 450) — 60px outside the viewport. Root cause: the TextInput (fontSize 30 with the long placeholder 'Posizione o N° ordine') keeps its intrinsic content width on RN Web, so flex:1 does not shrink it. Fix: on the search TextInput style add minWidth: 0 (React Native Web requires minWidth:0 to allow a flex child to shrink below its content size). Alternatively reduce input fontSize to 22-24 and/or shorten the placeholder. File: /app/frontend/app/magazzino.tsx:540 (styles.input) and the inputWrap at :528.",
+        "testID": "magazzino-scan-button",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "/magazzino",
+        "issues": [
+          "Search box container overflows viewport by ~98px at 390x844; scan button only reachable via horizontal scroll on a real device.",
+          "Non-blocking console warning observed from RN Web: 'props.pointerEvents is deprecated. Use style.pointerEvents' (not scan-related, surfaced during the test)."
+        ]
+      }
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_scan_etichetta.py",
+    "/app/test_reports/pytest/pytest_scan_etichetta.xml"
+  ],
+  "action_items": [
+    "Fix magazzino search bar overflow at 390x844: in /app/frontend/app/magazzino.tsx add `minWidth: 0` to styles.input (RN Web flex-shrink fix). Verify docScrollWidth === window.innerWidth after fix and that magazzino-scan-button bbox.x + bbox.width <= 390.",
+    "(Optional) Consider lowering the input fontSize from 30 to ~24 on narrow viewports, or using a shorter placeholder, to keep touch targets inside the viewport."
+  ],
+  "critical_code_review_comments": [
+    "server.py L617-662 /api/scan-etichetta: solid — MAX_IMG=8MB enforced before Gemini call (413); mime fallback to image/jpeg; extracts NNNN-NNNNNN substring from longer codes; dedupes candidati; sorts by number of matching pedane desc; tmp file cleaned in finally. Reads webp fine (streamed as image/webp to Gemini via FileContentWithMimeType).",
+    "ScanEtichetta.tsx L48-68 leggi(): single-candidate auto-fill vs choices-sheet logic is correct (if found.length===1 OR candidati.length===1 → auto-fill, else show sheet). Empty candidati → graceful toast 'Nessun codice letto…'.",
+    "upload.ts: web path uses fetch(uri).blob() + FormData.append(field, blob, name) — correct for RN Web where expo-image-picker returns a blob: or object URL; backend receives multipart file with the expected name.",
+    "magazzino.tsx:193 <ScanEtichetta onCode={setQ}/> is placed inside inputWrap AFTER the clear button but the inputWrap total intrinsic width exceeds the 390 viewport because the TextInput style lacks minWidth:0; this is the ONLY blocking issue found."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (5/5)", "frontend": "80% — scan flow works, search-bar layout fails viewport-fit requirement at 390x844"},
+  "seed_data_creation": "None. Read-only test using the pre-existing real pedane for position 2619-019331 (2 pedane under order 25023487, Peter Brozulat GmbH / IL GALLETTO SOC. CON). No DB mutation.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Public URL EXPO_PUBLIC_BACKEND_URL=https://pedana-lookup.preview.emergentagent.com. Office pw antolini2024. Scan endpoint: POST /api/scan-etichetta multipart 'file' (no auth). Verified real handwritten webp returns {codice:'2619-019331', pedane:2} in ~5-11s. Frontend web uses expo-image-picker fallback → file chooser; use page.expect_file_chooser() before clicking magazzino-scan-button and set_files('/tmp/sample_label.webp'). If scan-permission-sheet appears, click scan-allow-camera-button via page.evaluate (bottom-sheet viewport quirk). After scan, assert magazzino-search-input.value == '2619-019331'. Known UI layout bug: horizontal overflow at 390x844 (docScrollWidth=488 vs viewport 390). Testing used force=True click so the test passes, but a real touch on-device would require horizontal scroll. Candidates returned by the handwritten sample tend to be a single matching code so scan-choices-sheet rarely opens — the sheet logic itself was code-reviewed (ScanEtichetta.tsx:58-59) and the fallback testID path is scan-choice-{codice}.",
+  "rca_of_issue": "Search bar overflow RCA: inputWrap has flexDirection:row with children [magnify icon 28] + [TextInput flex:1] + [clear 34] + [scan 52] plus 14+6+14 horizontal padding (~96px fixed). On RN Web, a flex child's default `min-width` is `auto` (content-based). The TextInput has fontSize:30 and placeholder 'Posizione o N° ordine' (~17 chars). The intrinsic content width is ~360px, so flex:1 cannot shrink it, forcing the inputWrap to render at ~456px which exceeds the 358px available inside searchCard (390 - 2*16 padding). Repro: open /magazzino at viewport 390x844 → evaluate document.documentElement.scrollWidth → 488. Mitigation: add `minWidth: 0` to styles.input (the standard RN Web flexbox shrink fix). Verified by inspection — no code change applied here (design/visual decision left to main agent)."
+}

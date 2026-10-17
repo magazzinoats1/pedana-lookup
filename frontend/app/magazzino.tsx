@@ -10,6 +10,7 @@ import { api, formatDate, MAG_TOKEN_KEY, Pedana } from "@/src/api";
 import { storage } from "@/src/utils/storage";
 import { AppHeader } from "@/src/components/AppHeader";
 import { PedanaDetail, statoColor } from "@/src/components/PedanaDetail";
+import { ScanEtichetta } from "@/src/components/ScanEtichetta";
 import { Sheet } from "@/src/components/Sheet";
 import { useToast } from "@/src/components/Toast";
 import { Button, Field, IconButton } from "@/src/components/ui";
@@ -189,6 +190,7 @@ export default function Magazzino() {
               <MaterialDesignIcons name="close-circle" size={26} color={colors.muted} />
             </Pressable>
           )}
+          <ScanEtichetta onCode={setQ} />
         </View>
       </View>
       <View style={styles.chipWrap}>
@@ -524,6 +526,7 @@ const useStyles = makeStyles((c) => ({
   hint: { fontFamily: fonts.text, fontSize: 13, color: c.muted, marginBottom: 12 },
   bold: { fontFamily: fonts.textBold, color: c.onSurfaceSecondary },
   inputWrap: {
+    paddingRight: 6,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
@@ -534,7 +537,7 @@ const useStyles = makeStyles((c) => ({
     minHeight: 68,
     backgroundColor: c.surfaceSecondary,
   },
-  input: { flex: 1, fontFamily: fonts.display, fontSize: 30, color: c.onSurface, paddingVertical: 8, ...({ outlineWidth: 0 } as object) },
+  input: { flex: 1, minWidth: 0, fontFamily: fonts.display, fontSize: 26, color: c.onSurface, paddingVertical: 8, ...({ outlineWidth: 0 } as object) },
   clear: { padding: 4 },
   content: { padding: 16 },
   loader: { marginTop: 48 },

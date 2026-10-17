@@ -9,14 +9,21 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.emergent.pedanalookup.vune68"
+      "bundleIdentifier": "com.emergent.pedanalookup.vune68",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Fotografa le etichette per trovare le pedane",
+        "NSPhotoLibraryUsageDescription": "Scegli foto di etichette da leggere"
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#000000"
       },
-      "package": "com.emergent.pedanalookup.vune68"
+      "package": "com.emergent.pedanalookup.vune68",
+      "permissions": [
+        "android.permission.CAMERA"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -40,7 +47,14 @@
       "expo-web-browser",
       "expo-status-bar",
       "@react-native-vector-icons/material-design-icons",
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Fotografa le etichette per trovare le pedane",
+          "photosPermission": "Scegli foto di etichette da leggere"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
