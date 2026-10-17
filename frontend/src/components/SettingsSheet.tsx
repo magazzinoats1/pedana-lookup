@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Text, View } from "react-native";
+import { useRouter } from "expo-router";
 
 import { api } from "@/src/api";
 import { Sheet } from "@/src/components/Sheet";
@@ -17,6 +18,11 @@ export function SettingsSheet({ visible, onClose, cooperativa, onCoopSaved }: Pr
   const [busyPw, setBusyPw] = useState(false);
   const toast = useToast();
   const styles = useStyles();
+  const router = useRouter();
+  const vai = (path: "/ufficio/magazzinieri" | "/ufficio/archivio") => {
+    onClose();
+    router.push(path);
+  };
 
   useEffect(() => {
     if (visible) {
@@ -62,6 +68,11 @@ export function SettingsSheet({ visible, onClose, cooperativa, onCoopSaved }: Pr
   return (
     <Sheet visible={visible} onClose={onClose} testID="settings-sheet">
       <Text style={styles.title}>Impostazioni</Text>
+      <View style={styles.links}>
+        <Button label="Magazzinieri e PIN" variant="secondary" icon="account-hard-hat" onPress={() => vai("/ufficio/magazzinieri")} testID="settings-magazzinieri-button" />
+        <Button label="Archivio ordini" variant="secondary" icon="archive-outline" onPress={() => vai("/ufficio/archivio")} testID="settings-archivio-button" />
+      </View>
+      <View style={styles.divider} />
       <Text style={styles.section}>Cooperativa</Text>
       <Field label="Nome cooperativa" value={coop} onChangeText={setCoop} placeholder="es. Coop Verona" testID="settings-coop-input" />
       <Button label="Salva cooperativa" variant="ghost" icon="content-save-outline" loading={busyCoop} onPress={salvaCoop} testID="settings-coop-save-button" />
@@ -79,5 +90,6 @@ export function SettingsSheet({ visible, onClose, cooperativa, onCoopSaved }: Pr
 const useStyles = makeStyles((c) => ({
   title: { fontFamily: fonts.display, fontSize: 28, color: c.brandPrimary, marginBottom: 8 },
   section: { fontFamily: fonts.textBold, fontSize: 14, color: c.onSurfaceSecondary, marginBottom: 10, marginTop: 4 },
+  links: { gap: 10 },
   divider: { height: 1, backgroundColor: c.divider, marginVertical: 20 },
 }));

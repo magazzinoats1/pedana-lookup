@@ -27,10 +27,11 @@ User uploaded a KÖLLA transport-order PDF and a reference web app (GestioneLogi
 - Daily report: PDF via expo-print + share sheet (web: print dialog), per order table with stato, ora, operatore
 - numeroPedane per position (PDF 'Pedane' column) everywhere incl. report
 - Magazzino: fixed collapsed filter chips (two fixed rows: date / stato), simplified list, groups sorted by numero ordine asc
+- PIN Magazzinieri: office manages workers (nome + PIN 4-6 cifre, bcrypt) in /ufficio/magazzinieri; worker login (5 wrong PIN -> 5 min lock) gives role=magazzino session; stato/scarica endpoints require worker session, name taken from session; worker tokens rejected on office endpoints
+- Archivio automatico: orders fully completo with last dataConsegna > 30 days archived hourly (archiviato flag), hidden from lists; /ufficio/archivio with search, pagination, 'Archivia ora', 'Ripristina'
 - Security audit run: SEC-001 default office password (change it), SEC-002 wildcard CORS, hardening: login rate limit, PDF size cap
 
 ## Backlog
-- P1: Archive/pagination when pedane > 1000 (lists currently capped at 1000)
 - P1: Security fixes from audit (force password change on first login, login rate limit, PDF size limit, restrict CORS)
 - P1: Barcode/label scan for positions (camera)
 - P1: Daily arrivals overview / filters by stato and date

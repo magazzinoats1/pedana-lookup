@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { MaterialDesignIcons } from "@react-native-vector-icons/material-design-icons";
 
-import { api, formatDate, OPERATORE_KEY, Pedana } from "@/src/api";
+import { api, formatDate, MAG_TOKEN_KEY, Pedana } from "@/src/api";
 import { storage } from "@/src/utils/storage";
 import { AppHeader } from "@/src/components/AppHeader";
 import { PedanaDetail, statoColor } from "@/src/components/PedanaDetail";
@@ -30,38 +30,61 @@ export default function Magazzino() {
   const toast = useToast();
   const [operatore, setOperatore] = useState<string | null>(null);
   const [showNome, setShowNome] = useState(false);
-  const [nomeInput, setNomeInput] = useState("");
-  const [nomeErr, setNomeErr] = useState("");
-  const pendingScarica = useRef<{ numero: string; mancanti: number } | null>(null);
+  const [workers, setWorkers] = useState<{ id: string; nome: string }[]>([]);
+  const [workerId, setWorkerId] = useState<string | null>(null);
+  const [pin, setPin] = useState("");
+  const [pinErr, setPinErr] = useState("");
+  const [logging, setLogging] = useState(false);
 
   useEffect(() => {
-    storage.getItem<string | null>(OPERATORE_KEY, null).then((n) => setOperatore(n || null));
+    storage.secureGet(MAG_TOKEN_KEY, null).then((t) => {
+      if (!t) return;
+      api<{ nome: string }>("/auth/magazzino/me", { auth: "magazzino" })
+        .then((r) => setOperatore(r.nome))
+        .catch(() => storage.secureRemove(MAG_TOKEN_KEY));
+    });
   }, []);
 
   function apriNome() {
-    setNomeInput(operatore ?? "");
-    setNomeErr("");
+    setPin("");
+    setPinErr("");
     setShowNome(true);
+    api<{ id: string; nome: string }[]>("/magazzinieri/nomi")
+      .then(setWorkers)
+      .catch((e) => setPinErr(e.message));
   }
 
-  async function salvaNome() {
-    const n = nomeInput.trim();
-    if (n.length < 2) return setNomeErr("Inserisci il tuo nome");
-    await storage.setItem(OPERATORE_KEY, n);
-    setOperatore(n);
-    setShowNome(false);
-    toast(`Ciao ${n}, ora puoi segnare gli scarichi`);
-    if (pendingScarica.current) {
-      setScaricaOrdine(pendingScarica.current);
-      pendingScarica.current = null;
+  async function accedi() {
+    if (!workerId) return setPinErr("Scegli il tuo nome");
+    if (!pin) return setPinErr("Inserisci il PIN");
+    setLogging(true);
+    try {
+      const r = await api<{ token: string; nome: string }>("/auth/magazzino/login", { method: "POST", body: { id: workerId, pin } });
+      await storage.secureSet(MAG_TOKEN_KEY, r.token);
+      setOperatore(r.nome);
+      setShowNome(false);
+      setPin("");
+      toast(`Ciao ${r.nome}, ora puoi segnare gli scarichi`);
+    } catch (e: any) {
+      setPinErr(e.message);
+      setPin("");
+    } finally {
+      setLogging(false);
     }
   }
 
-  async function rimuoviNome() {
-    await storage.removeItem(OPERATORE_KEY);
+  async function esciOperatore() {
+    await api("/auth/magazzino/logout", { method: "POST", auth: "magazzino" }).catch(() => {});
+    await storage.secureRemove(MAG_TOKEN_KEY);
     setOperatore(null);
     setShowNome(false);
-    toast("Nome rimosso: solo consultazione");
+    toast("Uscito: solo consultazione");
+  }
+
+  function sessioneScaduta() {
+    storage.secureRemove(MAG_TOKEN_KEY);
+    setOperatore(null);
+    apriNome();
   }
   const reqId = useRef(0);
   const router = useRouter();
@@ -104,13 +127,17 @@ export default function Magazzino() {
     if (!scaricaOrdine) return;
     setScaricando(true);
     try {
-      const r = await api<{ aggiornate: number }>("/ordini/scarica", { method: "POST", body: { numeroOrdine: scaricaOrdine.numero, operatore } });
+      const r = await api<{ aggiornate: number }>("/ordini/scarica", { method: "POST", body: { numeroOrdine: scaricaOrdine.numero }, auth: "magazzino" });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       toast(`Ordine ${scaricaOrdine.numero}: ${r.aggiornate} pedane scaricate`);
       setScaricaOrdine(null);
       await search(q);
     } catch (e: any) {
       toast(e.message, "error");
+      if (e.status === 401 || e.status === 403) {
+        setScaricaOrdine(null);
+        sessioneScaduta();
+      }
     } finally {
       setScaricando(false);
     }
@@ -134,13 +161,13 @@ export default function Magazzino() {
           >
             <MaterialDesignIcons name={operatore ? "account-hard-hat" : "account-alert-outline"} size={18} color={operatore ? colors.onBrandTertiary : colors.onWarningTint} />
             <Text style={[styles.opText, !operatore && { color: colors.onWarningTint }]} numberOfLines={1} testID="magazzino-operatore-nome">
-              {operatore ?? "Inserisci nome"}
+              {operatore ?? "Accedi"}
             </Text>
           </Pressable>
         </View>
         {!operatore && (
           <Text style={styles.readonlyHint} testID="magazzino-readonly-hint">
-            Solo consultazione: inserisci il tuo nome per segnare gli scarichi
+            Solo consultazione: accedi con nome e PIN per segnare gli scarichi
           </Text>
         )}
         <View style={styles.inputWrap}>
@@ -265,7 +292,7 @@ export default function Magazzino() {
                 <Text style={styles.backText}>{q.trim() ? `Torna ai ${results.length} risultati` : "Torna alla lista merce"}</Text>
               </Pressable>
             )}
-            <PedanaDetail key={selected.id} pedana={selected} onUpdated={onUpdated} operatore={operatore} onRequestName={apriNome} />
+            <PedanaDetail key={selected.id} pedana={selected} onUpdated={onUpdated} operatore={operatore} onRequestName={operatore ? sessioneScaduta : apriNome} />
           </View>
         ) : (
           <View style={styles.gap}>
@@ -334,38 +361,60 @@ export default function Magazzino() {
         )}
       </ScrollView>
 
-      <Sheet
-        visible={showNome}
-        onClose={() => {
-          pendingScarica.current = null;
-          setShowNome(false);
-        }}
-        testID="magazzino-nome-sheet"
-      >
+      <Sheet visible={showNome} onClose={() => setShowNome(false)} testID="magazzino-nome-sheet">
         <View style={styles.sheetHead}>
           <MaterialDesignIcons name="account-hard-hat" size={44} color={colors.brandPrimary} />
-          <Text style={styles.sheetTitle}>Nome magazziniere</Text>
-          <Text style={styles.sheetSub}>Il tuo nome verrà registrato su ogni scarico che segni</Text>
+          <Text style={styles.sheetTitle}>{operatore ? `Collegato: ${operatore}` : "Accesso magazziniere"}</Text>
+          <Text style={styles.sheetSub}>
+            {operatore ? "Il tuo nome viene registrato su ogni scarico" : "Scegli il tuo nome e inserisci il PIN dato dall'ufficio"}
+          </Text>
         </View>
-        <Field
-          label="Nome e cognome"
-          value={nomeInput}
-          onChangeText={(t) => {
-            setNomeInput(t);
-            setNomeErr("");
-          }}
-          placeholder="es. Mario Rossi"
-          autoFocus
-          autoCapitalize="words"
-          returnKeyType="done"
-          onSubmitEditing={salvaNome}
-          error={nomeErr}
-          testID="magazzino-nome-input"
-        />
-        <View style={styles.sheetBtns}>
-          <Button label="Salva nome" icon="check" onPress={salvaNome} testID="magazzino-nome-save-button" />
-          {!!operatore && <Button label="Rimuovi nome (solo consultazione)" variant="danger" icon="account-remove-outline" onPress={rimuoviNome} testID="magazzino-nome-remove-button" />}
-        </View>
+        {operatore ? (
+          <Button label="Esci (solo consultazione)" variant="danger" icon="logout" onPress={esciOperatore} testID="magazzino-nome-remove-button" />
+        ) : (
+          <>
+            {workers.length === 0 ? (
+              <Text style={styles.noWorkers} testID="magazzino-no-workers">Nessun magazziniere registrato: chiedi all&apos;ufficio di crearti un PIN.</Text>
+            ) : (
+              <View style={styles.workerGrid}>
+                {workers.map((w) => {
+                  const active = workerId === w.id;
+                  return (
+                    <Pressable
+                      key={w.id}
+                      testID={`magazzino-worker-${w.id}`}
+                      onPress={() => {
+                        setWorkerId(w.id);
+                        setPinErr("");
+                      }}
+                      style={[styles.workerChip, active && styles.workerChipActive]}
+                    >
+                      <Text style={[styles.workerText, active && { color: colors.onBrandPrimary }]}>{w.nome}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
+            <Field
+              label="PIN"
+              value={pin}
+              onChangeText={(t) => {
+                setPin(t.replace(/[^0-9]/g, "").slice(0, 6));
+                setPinErr("");
+              }}
+              placeholder="••••"
+              keyboardType="number-pad"
+              secureTextEntry
+              maxLength={6}
+              returnKeyType="go"
+              onSubmitEditing={accedi}
+              error={pinErr}
+              testID="magazzino-pin-input"
+              style={styles.pinInput}
+            />
+            <Button label="Accedi" icon="login" loading={logging} onPress={accedi} testID="magazzino-nome-save-button" />
+          </>
+        )}
       </Sheet>
 
       <Sheet visible={!!scaricaOrdine} onClose={() => setScaricaOrdine(null)} testID="magazzino-scarica-sheet">
@@ -447,6 +496,12 @@ const useStyles = makeStyles((c) => ({
   sheetTitle: { fontFamily: fonts.textBold, fontSize: 19, color: c.onSurface, textAlign: "center" },
   sheetSub: { fontFamily: fonts.text, fontSize: 14, color: c.onSurfaceTertiary, textAlign: "center" },
   sheetBtns: { gap: 10 },
+  noWorkers: { fontFamily: fonts.textMedium, fontSize: 14, color: c.onWarningTint, backgroundColor: c.warningTint, borderRadius: 10, padding: 12, marginBottom: 14 },
+  workerGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 14 },
+  workerChip: { minHeight: 48, paddingHorizontal: 16, borderRadius: 12, borderWidth: 1.5, borderColor: c.borderStrong, justifyContent: "center", backgroundColor: c.surfaceSecondary },
+  workerChipActive: { backgroundColor: c.brandPrimary, borderColor: c.brandPrimary },
+  workerText: { fontFamily: fonts.textBold, fontSize: 15, color: c.onSurfaceSecondary },
+  pinInput: { fontFamily: fonts.display, fontSize: 28, letterSpacing: 8, textAlign: "center" },
   chipDot: { width: 8, height: 8, borderRadius: 4 },
   chipText: { fontFamily: fonts.textSemi, fontSize: 14 },
   chipCount: { fontFamily: fonts.textBold, fontSize: 13 },

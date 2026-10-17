@@ -2,7 +2,7 @@ import { storage } from "@/src/utils/storage";
 
 const BASE = `${process.env.EXPO_PUBLIC_BACKEND_URL}/api`;
 export const TOKEN_KEY = "ufficio_session_token";
-export const OPERATORE_KEY = "magazziniere_nome";
+export const MAG_TOKEN_KEY = "magazziniere_session_token";
 
 export type Stato = "attesa" | "parziale" | "completo";
 
@@ -26,6 +26,8 @@ export type Pedana = {
   noteParziale: string;
   arrivoParzialeDa?: string;
   arrivoCompletoDa?: string;
+  archiviato?: boolean;
+  archiviatoAt?: string | null;
 };
 
 export type OrdineForm = {
@@ -48,13 +50,16 @@ export class ApiError extends Error {
   }
 }
 
-async function authHeader(): Promise<Record<string, string>> {
-  const t = await storage.secureGet(TOKEN_KEY, null);
+async function authHeader(kind: "ufficio" | "magazzino"): Promise<Record<string, string>> {
+  const t = await storage.secureGet(kind === "magazzino" ? MAG_TOKEN_KEY : TOKEN_KEY, null);
   return t ? { Authorization: `Bearer ${t}` } : {};
 }
 
-export async function api<T>(path: string, opts: { method?: string; body?: unknown; form?: FormData } = {}): Promise<T> {
-  const headers: Record<string, string> = await authHeader();
+export async function api<T>(
+  path: string,
+  opts: { method?: string; body?: unknown; form?: FormData; auth?: "ufficio" | "magazzino" } = {},
+): Promise<T> {
+  const headers: Record<string, string> = await authHeader(opts.auth ?? "ufficio");
   let body: BodyInit | undefined;
   if (opts.form) body = opts.form;
   else if (opts.body !== undefined) {

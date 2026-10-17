@@ -10,6 +10,7 @@ import hashlib
 import secrets
 import logging
 import tempfile
+import asyncio
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Literal
@@ -89,6 +90,9 @@ class Pedana(BaseDocument):
     noteParziale: str = ""
     arrivoParzialeDa: str = ""
     arrivoCompletoDa: str = ""
+    archiviato: bool = False
+    archiviatoAt: Optional[str] = None
+    ripristinato: bool = False
 
 
 class OrdineForm(BaseModel):
@@ -127,19 +131,36 @@ class DupReq(BaseModel):
 class StatoReq(BaseModel):
     stato: Literal["attesa", "parziale", "completo"]
     noteParziale: str = ""
-    operatore: str = Field(min_length=1, max_length=60)
 
 
 class ScaricaOrdineReq(BaseModel):
     numeroOrdine: str = Field(min_length=1)
-    operatore: str = Field(min_length=1, max_length=60)
 
 
-def nome_operatore(raw: str) -> str:
-    nome = raw.strip()
-    if not nome:
-        raise HTTPException(status_code=400, detail="Inserisci il nome del magazziniere")
-    return nome
+class RipristinaReq(BaseModel):
+    numeroOrdine: str = Field(min_length=1)
+
+
+PIN_PATTERN = r"^\d{4,6}$"
+
+
+class MagazziniereIn(BaseModel):
+    nome: str = Field(min_length=2, max_length=60)
+    pin: str = Field(pattern=PIN_PATTERN)
+
+
+class PinReq(BaseModel):
+    pin: str = Field(pattern=PIN_PATTERN)
+
+
+class MagLoginReq(BaseModel):
+    id: str = Field(min_length=1)
+    pin: str = Field(min_length=1, max_length=12)
+
+
+MAX_PIN_FAILS = 5
+PIN_LOCK_MINUTES = 5
+ARCHIVE_DAYS = 30
 
 
 class LoginReq(BaseModel):
@@ -156,14 +177,32 @@ class CoopReq(BaseModel):
 
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
-async def require_ufficio(authorization: Optional[str] = Header(default=None)):
+async def _session(authorization: Optional[str], msg: str):
     if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Accesso ufficio richiesto")
+        raise HTTPException(status_code=401, detail=msg)
     raw = authorization[7:].strip()
     session = await db.sessions.find_one({"token_hash": token_digest(raw)})
     if not session or session["expires_at"].replace(tzinfo=timezone.utc) <= now():
         raise HTTPException(status_code=401, detail="Sessione scaduta")
     return session
+
+
+async def require_ufficio(authorization: Optional[str] = Header(default=None)):
+    session = await _session(authorization, "Accesso ufficio richiesto")
+    if session.get("role", "ufficio") != "ufficio":
+        raise HTTPException(status_code=403, detail="Accesso ufficio richiesto")
+    return session
+
+
+async def require_magazziniere(authorization: Optional[str] = Header(default=None)):
+    session = await _session(authorization, "Accedi con nome e PIN")
+    if session.get("role") != "magazzino":
+        raise HTTPException(status_code=403, detail="Accedi con nome e PIN")
+    worker = await db.magazzinieri.find_one({"id": session.get("magazziniere_id")})
+    if not worker:
+        await db.sessions.delete_one({"_id": session["_id"]})
+        raise HTTPException(status_code=401, detail="Magazziniere non più attivo")
+    return worker
 
 
 @api.post("/auth/login")
@@ -174,10 +213,96 @@ async def login(body: LoginReq):
     raw = secrets.token_urlsafe(32)
     await db.sessions.insert_one({
         "token_hash": token_digest(raw),
+        "role": "ufficio",
         "created_at": now(),
         "expires_at": now() + timedelta(seconds=SESSION_TTL),
     })
     return {"token": raw}
+
+
+# ── Magazzinieri (PIN) ────────────────────────────────────────────────────────
+def worker_out(w: dict) -> dict:
+    return {"id": w["id"], "nome": w["nome"], "createdAt": w.get("createdAt")}
+
+
+@api.get("/magazzinieri/nomi")
+async def nomi_magazzinieri():
+    docs = await db.magazzinieri.find({}, {"_id": 0, "id": 1, "nome": 1}).sort("nome", 1).to_list(500)
+    return docs
+
+
+@api.get("/magazzinieri")
+async def list_magazzinieri(_=Depends(require_ufficio)):
+    docs = await db.magazzinieri.find({}).sort("nome", 1).to_list(500)
+    return [worker_out(d) for d in docs]
+
+
+@api.post("/magazzinieri")
+async def create_magazziniere(body: MagazziniereIn, _=Depends(require_ufficio)):
+    nome = body.nome.strip()
+    if await db.magazzinieri.find_one({"nome": {"$regex": f"^{re.escape(nome)}$", "$options": "i"}}):
+        raise HTTPException(status_code=400, detail="Esiste già un magazziniere con questo nome")
+    doc = {"id": str(uuid.uuid4()), "nome": nome, "pin_hash": hash_password(body.pin),
+           "failed": 0, "locked_until": None, "createdAt": now_iso()}
+    await db.magazzinieri.insert_one(doc)
+    return worker_out(doc)
+
+
+@api.put("/magazzinieri/{wid}/pin")
+async def change_pin(wid: str, body: PinReq, _=Depends(require_ufficio)):
+    res = await db.magazzinieri.update_one({"id": wid}, {"$set": {"pin_hash": hash_password(body.pin), "failed": 0, "locked_until": None}})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Magazziniere non trovato")
+    await db.sessions.delete_many({"role": "magazzino", "magazziniere_id": wid})
+    return {"ok": True}
+
+
+@api.delete("/magazzinieri/{wid}")
+async def delete_magazziniere(wid: str, _=Depends(require_ufficio)):
+    res = await db.magazzinieri.delete_one({"id": wid})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Magazziniere non trovato")
+    await db.sessions.delete_many({"role": "magazzino", "magazziniere_id": wid})
+    return {"ok": True}
+
+
+@api.post("/auth/magazzino/login")
+async def login_magazzino(body: MagLoginReq):
+    w = await db.magazzinieri.find_one({"id": body.id})
+    if not w:
+        raise HTTPException(status_code=401, detail="Nome o PIN errato")
+    locked = w.get("locked_until")
+    if locked and locked.replace(tzinfo=timezone.utc) > now():
+        mins = max(1, int((locked.replace(tzinfo=timezone.utc) - now()).total_seconds() // 60) + 1)
+        raise HTTPException(status_code=429, detail=f"Troppi tentativi: riprova tra {mins} min")
+    if not check_password(body.pin, w["pin_hash"]):
+        failed = w.get("failed", 0) + 1
+        upd = {"failed": failed}
+        if failed >= MAX_PIN_FAILS:
+            upd = {"failed": 0, "locked_until": now() + timedelta(minutes=PIN_LOCK_MINUTES)}
+        await db.magazzinieri.update_one({"id": w["id"]}, {"$set": upd})
+        if failed >= MAX_PIN_FAILS:
+            raise HTTPException(status_code=429, detail=f"Troppi tentativi: riprova tra {PIN_LOCK_MINUTES} min")
+        raise HTTPException(status_code=401, detail=f"PIN errato ({MAX_PIN_FAILS - failed} tentativi rimasti)")
+    await db.magazzinieri.update_one({"id": w["id"]}, {"$set": {"failed": 0, "locked_until": None}})
+    raw = secrets.token_urlsafe(32)
+    await db.sessions.insert_one({
+        "token_hash": token_digest(raw), "role": "magazzino", "magazziniere_id": w["id"],
+        "created_at": now(), "expires_at": now() + timedelta(seconds=SESSION_TTL),
+    })
+    return {"token": raw, "nome": w["nome"]}
+
+
+@api.get("/auth/magazzino/me")
+async def me_magazzino(w=Depends(require_magazziniere)):
+    return {"id": w["id"], "nome": w["nome"]}
+
+
+@api.post("/auth/magazzino/logout")
+async def logout_magazzino(authorization: Optional[str] = Header(default=None)):
+    if authorization and authorization.startswith("Bearer "):
+        await db.sessions.delete_one({"token_hash": token_digest(authorization[7:].strip()), "role": "magazzino"})
+    return {"ok": True}
 
 
 @api.get("/auth/me")
@@ -215,6 +340,9 @@ async def set_coop(body: CoopReq, _=Depends(require_ufficio)):
 
 
 # ── Pedane ────────────────────────────────────────────────────────────────────
+ACTIVE = {"archiviato": {"$ne": True}}
+
+
 def rx(q: str):
     return {"$regex": re.escape(q), "$options": "i"}
 
@@ -225,7 +353,7 @@ async def list_pedane(q: str = "", _=Depends(require_ufficio)):
     q = q.strip()
     if q:
         query = {"$or": [{f: rx(q)} for f in ["numeroOrdine", "codice", "agenzia", "mittente", "destinazione", "merce"]]}
-    docs = await db.pedane.find(query).sort("createdAt", -1).to_list(1000)
+    docs = await db.pedane.find({**query, **ACTIVE}).sort("createdAt", -1).to_list(1000)
     return [Pedana.from_mongo(d) for d in docs]
 
 
@@ -235,15 +363,15 @@ async def cerca(q: str = ""):
     if not q:
         return []
     exact = {"$regex": f"^{re.escape(q)}$", "$options": "i"}
-    docs = await db.pedane.find({"$or": [{"codice": exact}, {"numeroOrdine": exact}]}).sort("codice", 1).to_list(100)
+    docs = await db.pedane.find({"$or": [{"codice": exact}, {"numeroOrdine": exact}], **ACTIVE}).sort("codice", 1).to_list(100)
     if not docs:
-        docs = await db.pedane.find({"$or": [{"codice": rx(q)}, {"numeroOrdine": rx(q)}]}).sort("codice", 1).to_list(30)
+        docs = await db.pedane.find({"$or": [{"codice": rx(q)}, {"numeroOrdine": rx(q)}], **ACTIVE}).sort("codice", 1).to_list(30)
     return [Pedana.from_mongo(d) for d in docs]
 
 
 @api.get("/pedane/tutte", response_model=List[Pedana])
 async def tutte():
-    docs = await db.pedane.find({}).sort([("dataConsegna", -1), ("createdAt", -1)]).to_list(1000)
+    docs = await db.pedane.find(ACTIVE).sort([("dataConsegna", -1), ("createdAt", -1)]).to_list(1000)
     return [Pedana.from_mongo(d) for d in docs]
 
 
@@ -316,8 +444,8 @@ async def update_pedana(pid: str, body: UpdateReq, _=Depends(require_ufficio)):
 
 
 @api.patch("/pedane/{pid}/stato", response_model=Pedana)
-async def update_stato(pid: str, body: StatoReq):
-    operatore = nome_operatore(body.operatore)
+async def update_stato(pid: str, body: StatoReq, w=Depends(require_magazziniere)):
+    operatore = w["nome"]
     doc = await db.pedane.find_one({"id": pid})
     if not doc:
         raise HTTPException(status_code=404, detail="Pedana non trovata")
@@ -333,13 +461,66 @@ async def update_stato(pid: str, body: StatoReq):
 
 
 @api.post("/ordini/scarica")
-async def scarica_ordine(body: ScaricaOrdineReq):
-    operatore = nome_operatore(body.operatore)
+async def scarica_ordine(body: ScaricaOrdineReq, w=Depends(require_magazziniere)):
+    operatore = w["nome"]
     res = await db.pedane.update_many(
         {"numeroOrdine": body.numeroOrdine.strip(), "statoArrivo": {"$ne": "completo"}},
         {"$set": {"statoArrivo": "completo", "arrivoCompletoAt": now_iso(), "arrivoCompletoDa": operatore}},
     )
     return {"aggiornate": res.modified_count}
+
+
+# ── Archivio ──────────────────────────────────────────────────────────────────
+async def auto_archivia() -> int:
+    cutoff = (now() - timedelta(days=ARCHIVE_DAYS)).date().isoformat()
+    groups = db.pedane.aggregate([
+        {"$match": {"archiviato": {"$ne": True}, "ripristinato": {"$ne": True}}},
+        {"$group": {
+            "_id": "$numeroOrdine",
+            "n": {"$sum": 1},
+            "done": {"$sum": {"$cond": [{"$eq": ["$statoArrivo", "completo"]}, 1, 0]}},
+            "maxData": {"$max": "$dataConsegna"},
+        }},
+    ])
+    numeri = [g["_id"] async for g in groups if g["n"] == g["done"] and g["maxData"] and g["maxData"] < cutoff]
+    if not numeri:
+        return 0
+    await db.pedane.update_many({"numeroOrdine": {"$in": numeri}, "archiviato": {"$ne": True}},
+                                {"$set": {"archiviato": True, "archiviatoAt": now_iso()}})
+    logger.info("Archiviati %d ordini", len(numeri))
+    return len(numeri)
+
+
+async def archive_loop():
+    while True:
+        try:
+            await auto_archivia()
+        except Exception:
+            logger.exception("Archiviazione automatica fallita")
+        await asyncio.sleep(3600)
+
+
+@api.get("/archivio")
+async def archivio(q: str = "", skip: int = Query(0, ge=0), limit: int = Query(200, ge=1, le=500), _=Depends(require_ufficio)):
+    query = {"archiviato": True}
+    q = q.strip()
+    if q:
+        query["$or"] = [{f: rx(q)} for f in ["numeroOrdine", "codice", "agenzia", "mittente", "destinazione", "merce"]]
+    total = await db.pedane.count_documents(query)
+    docs = await db.pedane.find(query).sort([("dataConsegna", -1), ("numeroOrdine", 1), ("codice", 1)]).skip(skip).limit(limit).to_list(limit)
+    return {"total": total, "items": [Pedana.from_mongo(d).model_dump() for d in docs]}
+
+
+@api.post("/archivio/esegui")
+async def archivio_esegui(_=Depends(require_ufficio)):
+    return {"archiviati": await auto_archivia()}
+
+
+@api.post("/archivio/ripristina")
+async def archivio_ripristina(body: RipristinaReq, _=Depends(require_ufficio)):
+    res = await db.pedane.update_many({"numeroOrdine": body.numeroOrdine.strip(), "archiviato": True},
+                                      {"$set": {"archiviato": False, "archiviatoAt": None, "ripristinato": True}})
+    return {"ripristinate": res.modified_count}
 
 
 @api.delete("/pedane/{pid}")
@@ -440,6 +621,9 @@ async def startup():
     await db.pedane.create_index("id", unique=True)
     await db.pedane.create_index("codice")
     await db.pedane.create_index("numeroOrdine")
+    await db.pedane.create_index("archiviato")
+    await db.magazzinieri.create_index("id", unique=True)
+    asyncio.create_task(archive_loop())
 
 
 @app.on_event("shutdown")

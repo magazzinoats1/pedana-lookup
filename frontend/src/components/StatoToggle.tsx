@@ -22,7 +22,7 @@ export function StatoToggle({ pedana, onUpdated, operatore, onRequestName }: Pro
   async function update(s: Stato, noteParziale = "") {
     setBusy(true);
     try {
-      const p = await api<Pedana>(`/pedane/${pedana.id}/stato`, { method: "PATCH", body: { stato: s, noteParziale, operatore } });
+      const p = await api<Pedana>(`/pedane/${pedana.id}/stato`, { method: "PATCH", body: { stato: s, noteParziale }, auth: "magazzino" });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       onUpdated(p);
       setShowParziale(false);
@@ -30,6 +30,7 @@ export function StatoToggle({ pedana, onUpdated, operatore, onRequestName }: Pro
       toast(s === "completo" ? "Scarico completo registrato" : s === "parziale" ? "Arrivo parziale registrato" : "Stato annullato");
     } catch (e: any) {
       toast(e.message, "error");
+      if (e.status === 401 || e.status === 403) onRequestName();
     } finally {
       setBusy(false);
     }
@@ -48,7 +49,7 @@ export function StatoToggle({ pedana, onUpdated, operatore, onRequestName }: Pro
         )}
         <Pressable onPress={onRequestName} style={({ pressed }) => [styles.lockBtn, pressed && { opacity: 0.8 }]} testID="stato-richiedi-nome-button">
           <MaterialDesignIcons name="account-lock-outline" size={22} color={colors.onWarningTint} />
-          <Text style={styles.lockText}>Inserisci il tuo nome per segnare lo scarico</Text>
+          <Text style={styles.lockText}>Accedi con nome e PIN per segnare lo scarico</Text>
         </Pressable>
       </View>
     );
