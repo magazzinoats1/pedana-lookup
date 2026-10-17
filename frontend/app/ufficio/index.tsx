@@ -5,7 +5,7 @@ import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialDesignIcons } from "@react-native-vector-icons/material-design-icons";
 
-import { api, ApiError, formatDate, formatDateTime, Pedana, TOKEN_KEY } from "@/src/api";
+import { api, ApiError, formatDate, formatDateTime, isTrasbordo, Pedana, TOKEN_KEY } from "@/src/api";
 import { AppHeader } from "@/src/components/AppHeader";
 import { statoColor } from "@/src/components/PedanaDetail";
 import { SettingsSheet } from "@/src/components/SettingsSheet";
@@ -102,6 +102,11 @@ export default function Ufficio() {
                 <MaterialDesignIcons name="tag-outline" size={14} color={colors.onSuccessTint} />
                 <Text style={styles.chipCodeText}>{o.codice}</Text>
               </View>
+              {isTrasbordo(o.trasportatore) && (
+                <View style={styles.trasbordoChip} testID={`ufficio-trasbordo-${o.id}`}>
+                  <Text style={styles.trasbordoChipText}>TRASBORDO · {o.trasportatore}</Text>
+                </View>
+              )}
               <View style={[styles.statoPill, { borderColor: sc }]}>
                 <View style={[styles.dot, { backgroundColor: sc }]} />
                 <Text style={[styles.statoText, { color: sc }]}>{STATO_LABEL[o.statoArrivo]}</Text>
@@ -250,6 +255,8 @@ const useStyles = makeStyles((c) => ({
   chipOrderText: { fontFamily: fonts.display, fontSize: 16, color: c.onBrandPrimary },
   chipCode: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: c.successTint, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
   chipCodeText: { fontFamily: fonts.display, fontSize: 16, color: c.onSuccessTint },
+  trasbordoChip: { backgroundColor: c.warning, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
+  trasbordoChipText: { fontFamily: fonts.textBold, fontSize: 12, color: c.onWarning },
   statoPill: { flexDirection: "row", alignItems: "center", gap: 5, borderWidth: 1.5, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3 },
   dot: { width: 8, height: 8, borderRadius: 4 },
   statoText: { fontFamily: fonts.textSemi, fontSize: 12 },

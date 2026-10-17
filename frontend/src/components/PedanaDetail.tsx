@@ -3,7 +3,7 @@ import { Text, View } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { MaterialDesignIcons } from "@react-native-vector-icons/material-design-icons";
 
-import { formatDate, formatDateTime, Pedana } from "@/src/api";
+import { formatDate, formatDateTime, isTrasbordo, Pedana } from "@/src/api";
 import { StatoToggle } from "@/src/components/StatoToggle";
 import { InfoTile } from "@/src/components/ui";
 import { fonts, makeStyles, useTheme } from "@/src/theme";
@@ -60,6 +60,12 @@ export function PedanaDetail({
         <InfoTile label="N° PEDANE" value={pedana.numeroPedane ?? ""} icon="layers-triple-outline" testID="pedana-detail-numero-pedane" />
         <InfoTile label="N° COLLI" value={pedana.numeroColli} icon="package-variant-closed" testID="pedana-detail-colli" />
         <InfoTile label="AGENZIA" value={pedana.agenzia} icon="domain" testID="pedana-detail-agenzia" />
+        <InfoTile
+          label={isTrasbordo(pedana.trasportatore) ? "TRASBORDO" : "TRASPORTATORE"}
+          value={pedana.trasportatore || "Antolini Trasporti"}
+          icon={isTrasbordo(pedana.trasportatore) ? "swap-horizontal-bold" : "truck-outline"}
+          testID="pedana-detail-trasportatore"
+        />
       </View>
 
       {!!pedana.note && (

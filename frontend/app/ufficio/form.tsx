@@ -7,13 +7,13 @@ import { KeyboardAwareScrollView, KeyboardStickyView } from "react-native-keyboa
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialDesignIcons } from "@react-native-vector-icons/material-design-icons";
 
-import { api, ImportResult, OrdineForm, Pedana, PedanaRow } from "@/src/api";
+import { api, ImportResult, isTrasbordo, OrdineForm, Pedana, PedanaRow, TRASPORTATORE_DEFAULT } from "@/src/api";
 import { Sheet } from "@/src/components/Sheet";
 import { useToast } from "@/src/components/Toast";
 import { Button, Field, IconButton } from "@/src/components/ui";
 import { fonts, makeStyles, useTheme } from "@/src/theme";
 
-const emptyForm = { numeroOrdine: "", agenzia: "", note: "" };
+const emptyForm = { numeroOrdine: "", agenzia: "", trasportatore: TRASPORTATORE_DEFAULT, note: "" };
 const emptyRow: PedanaRow = { codice: "", destinazione: "", numeroColli: "", numeroPedane: "", mittente: "", merce: "" };
 
 type Errors = {
@@ -66,7 +66,7 @@ export default function OrdineFormScreen() {
     if (!editingId) return;
     api<Pedana>(`/pedane/${editingId}`)
       .then((o) => {
-        setForm({ numeroOrdine: o.numeroOrdine, agenzia: o.agenzia, note: o.note });
+        setForm({ numeroOrdine: o.numeroOrdine, agenzia: o.agenzia, trasportatore: o.trasportatore || TRASPORTATORE_DEFAULT, note: o.note });
         setData(isoToIt(o.dataConsegna));
         setRows([{ codice: o.codice, destinazione: o.destinazione, numeroColli: o.numeroColli, numeroPedane: o.numeroPedane || "", mittente: o.mittente, merce: o.merce || "" }]);
       })
@@ -143,7 +143,7 @@ export default function OrdineFormScreen() {
     setImportInfo("");
     try {
       const r = await api<ImportResult>("/import-pdf", { method: "POST", form: fd });
-      setForm({ numeroOrdine: r.numeroOrdine, agenzia: r.agenzia, note: r.note });
+      setForm({ numeroOrdine: r.numeroOrdine, agenzia: r.agenzia, trasportatore: r.trasportatore || TRASPORTATORE_DEFAULT, note: r.note });
       setData(isoToIt(r.dataConsegna));
       setRows(
         r.pedane.length
@@ -277,6 +277,28 @@ export default function OrdineFormScreen() {
           <View style={styles.orderBox}>
             <Field label="NUMERO ORDINE *" highlight value={form.numeroOrdine} onChangeText={setF("numeroOrdine")} placeholder="es. 25023467" error={errors.numeroOrdine} testID="form-numero-ordine-input" autoCapitalize="characters" />
           </View>
+          <Field
+            label="Trasportatore"
+            value={form.trasportatore}
+            onChangeText={setF("trasportatore")}
+            placeholder="es. Antolini Trasporti"
+            testID="form-trasportatore-input"
+            hint={isTrasbordo(form.trasportatore) ? undefined : "Antolini Trasporti: trasporto diretto"}
+          />
+          <View style={styles.quickDates}>
+            <Pressable onPress={() => setF("trasportatore")(TRASPORTATORE_DEFAULT)} style={[styles.qChip, !isTrasbordo(form.trasportatore) && styles.qChipActive]} testID="form-trasportatore-antolini-chip">
+              <Text style={[styles.qChipText, !isTrasbordo(form.trasportatore) && styles.qChipTextActive]}>Antolini Trasporti</Text>
+            </Pressable>
+            <Pressable onPress={() => setF("trasportatore")("")} style={[styles.qChip, isTrasbordo(form.trasportatore) && styles.qChipWarn]} testID="form-trasportatore-altro-chip">
+              <Text style={[styles.qChipText, isTrasbordo(form.trasportatore) && styles.qChipTextActive]}>Altro (trasbordo)</Text>
+            </Pressable>
+          </View>
+          {isTrasbordo(form.trasportatore) && (
+            <View style={styles.trasbordoBox} testID="form-trasbordo-warning">
+              <MaterialDesignIcons name="swap-horizontal-bold" size={20} color={colors.onWarningTint} />
+              <Text style={styles.trasbordoText}>Trasbordo: merce portata da {form.trasportatore.trim()}</Text>
+            </View>
+          )}
           <Field label="Agenzia" value={form.agenzia} onChangeText={setF("agenzia")} placeholder="Chi ha ordinato" testID="form-agenzia-input" />
           <Field
             label="Data consegna *"
@@ -446,6 +468,11 @@ const useStyles = makeStyles((c) => ({
   orderBox: { backgroundColor: c.brandTertiary, borderRadius: 10, padding: 12, paddingBottom: 0, marginBottom: 14 },
   quickDates: { flexDirection: "row", gap: 8, marginTop: -6, marginBottom: 14 },
   qChip: { height: 36, paddingHorizontal: 14, borderRadius: 999, backgroundColor: c.surfaceTertiary, justifyContent: "center", flexShrink: 0 },
+  qChipActive: { backgroundColor: c.brandPrimary },
+  qChipWarn: { backgroundColor: c.warning },
+  qChipTextActive: { color: c.onBrandPrimary },
+  trasbordoBox: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: c.warningTint, borderRadius: 10, padding: 10, marginBottom: 14, marginTop: -4 },
+  trasbordoText: { flex: 1, fontFamily: fonts.textBold, fontSize: 13, color: c.onWarningTint },
   qChipText: { fontFamily: fonts.textSemi, fontSize: 13, color: c.onSurfaceTertiary },
   noteInput: { minHeight: 72, paddingTop: 12, textAlignVertical: "top" },
   rowHead: { flexDirection: "row", alignItems: "center" },

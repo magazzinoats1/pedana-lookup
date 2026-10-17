@@ -10,6 +10,7 @@ export type Pedana = {
   id: string;
   numeroOrdine: string;
   agenzia: string;
+  trasportatore?: string;
   mittente: string;
   dataConsegna: string;
   note: string;
@@ -33,6 +34,7 @@ export type Pedana = {
 export type OrdineForm = {
   numeroOrdine: string;
   agenzia: string;
+  trasportatore: string;
   mittente: string;
   dataConsegna: string;
   note: string;
@@ -78,6 +80,13 @@ export async function api<T>(
     throw new ApiError(detail, res.status);
   }
   return res.json() as Promise<T>;
+}
+
+export const TRASPORTATORE_DEFAULT = "Antolini Trasporti";
+
+export function isTrasbordo(trasportatore?: string) {
+  const t = (trasportatore ?? "").trim();
+  return !!t && !/antolini/i.test(t);
 }
 
 export function formatDate(s: string) {

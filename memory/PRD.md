@@ -32,6 +32,7 @@ User uploaded a KÖLLA transport-order PDF and a reference web app (GestioneLogi
 - Scansione etichette (Magazzino): camera button next to search → photo (expo-image-picker) → POST /api/scan-etichetta (Gemini reads printed codes) → fills search; choice sheet when several codes; permission flow with Apri impostazioni + gallery fallback; prompt tuned for HANDWRITTEN, different signs (verified on Il Galletto sign 2619-019331, 3/3 reads)
 - Magazzino default view = 'Da scaricare' (pedane in attesa, not yet arrived) with banner count; typing/scanning a search switches to Tutte, clearing returns to Da scaricare
 - Avviso ritardi: ONLY pedane in attesa due TODAY after 14:00 local (past days not highlighted), flagged 'In ritardo' (red pill + banner in Magazzino, stat + row label in Riepilogo) — src/ritardi.ts
+- Trasportatore per order (default 'Antolini Trasporti', PDF top-left addressee); not Antolini => TRASBORDO badge in Ufficio list, Magazzino groups, detail, Riepilogo, report
 - Security audit run: SEC-001 default office password (change it), SEC-002 wildcard CORS, hardening: login rate limit, PDF size cap
 
 ## Backlog

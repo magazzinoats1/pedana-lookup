@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { MaterialDesignIcons } from "@react-native-vector-icons/material-design-icons";
 
-import { api, formatDate, MAG_TOKEN_KEY, Pedana } from "@/src/api";
+import { api, formatDate, isTrasbordo, MAG_TOKEN_KEY, Pedana } from "@/src/api";
 import { storage } from "@/src/utils/storage";
 import { AppHeader } from "@/src/components/AppHeader";
 import { PedanaDetail, statoColor } from "@/src/components/PedanaDetail";
@@ -340,6 +340,12 @@ export default function Magazzino() {
                   <View style={styles.groupHead}>
                     <View style={styles.flex}>
                       <Text style={styles.groupNum} testID={`magazzino-group-numero-${g.numero}`}>Ord. {g.numero}</Text>
+                      {isTrasbordo(g.items[0].trasportatore) && (
+                        <View style={styles.trasbordoChip} testID={`magazzino-trasbordo-${g.numero}`}>
+                          <MaterialDesignIcons name="swap-horizontal-bold" size={14} color={colors.onWarning} />
+                          <Text style={styles.trasbordoChipText} numberOfLines={1}>TRASBORDO · {g.items[0].trasportatore}</Text>
+                        </View>
+                      )}
                       <Text style={styles.groupMeta} numberOfLines={1} testID={`magazzino-group-summary-${g.numero}`}>
                         {formatDate(g.items[0].dataConsegna)} · {g.items.length} posizion{g.items.length === 1 ? "e" : "i"}{pal ? ` · ${pal} pedane` : ""}{colli ? ` · ${colli} colli` : ""}
                       </Text>
@@ -529,6 +535,8 @@ const useStyles = makeStyles((c) => ({
   lateSub: { fontFamily: fonts.textMedium, fontSize: 12, color: c.onSurfaceTertiary },
   latePill: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: c.error, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
   latePillText: { fontFamily: fonts.textBold, fontSize: 12, color: c.onError },
+  trasbordoChip: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-start", backgroundColor: c.warning, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2, marginVertical: 2, maxWidth: "100%" },
+  trasbordoChipText: { fontFamily: fonts.textBold, fontSize: 11, color: c.onWarning, flexShrink: 1 },
   daBanner: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: c.brandTertiary, borderRadius: 12, padding: 14, borderWidth: 1.5, borderColor: c.brandSecondary },
   daTitle: { fontFamily: fonts.display, fontSize: 24, color: c.brandPrimary },
   daSub: { fontFamily: fonts.textMedium, fontSize: 13, color: c.onSurfaceTertiary },

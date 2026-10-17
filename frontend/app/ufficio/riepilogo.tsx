@@ -5,7 +5,7 @@ import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialDesignIcons } from "@react-native-vector-icons/material-design-icons";
 
-import { api, ApiError, Pedana, TOKEN_KEY } from "@/src/api";
+import { api, ApiError, isTrasbordo, Pedana, TOKEN_KEY } from "@/src/api";
 import { statoColor } from "@/src/components/PedanaDetail";
 import { useToast } from "@/src/components/Toast";
 import { Button, IconButton } from "@/src/components/ui";
@@ -155,6 +155,9 @@ export default function Riepilogo() {
                     <MaterialDesignIcons name={complete ? "truck-check" : "truck-outline"} size={26} color={complete ? colors.success : colors.brandPrimary} />
                     <View style={styles.flex}>
                       <Text style={styles.cardNum}>{g.numero}</Text>
+                      {isTrasbordo(g.items[0].trasportatore) && (
+                        <Text style={styles.trasbordo} numberOfLines={1} testID={`riepilogo-trasbordo-${g.numero}`}>TRASBORDO · {g.items[0].trasportatore}</Text>
+                      )}
                       <Text style={styles.cardMeta} numberOfLines={1}>
                         {g.items[0].agenzia || "—"} · {g.items.length} posizioni{pal ? ` · ${pal} pedane` : ""}{colli ? ` · ${colli} colli` : ""}
                       </Text>
@@ -247,6 +250,7 @@ const useStyles = makeStyles((c) => ({
   card: { backgroundColor: c.surfaceSecondary, borderRadius: 14, borderWidth: 1, borderColor: c.border, padding: 14, gap: 10 },
   cardHead: { flexDirection: "row", alignItems: "center", gap: 10 },
   cardNum: { fontFamily: fonts.displayHeavy, fontSize: 24, color: c.brandPrimary },
+  trasbordo: { fontFamily: fonts.textBold, fontSize: 12, color: c.onWarningTint },
   cardMeta: { fontFamily: fonts.text, fontSize: 12, color: c.muted },
   cardCount: { fontFamily: fonts.displayHeavy, fontSize: 26 },
   row: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 6, borderTopWidth: 1, borderTopColor: c.divider },

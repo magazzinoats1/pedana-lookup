@@ -74,6 +74,7 @@ class Pedana(BaseDocument):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     numeroOrdine: str
     agenzia: str = ""
+    trasportatore: str = ""
     mittente: str
     dataConsegna: str
     note: str = ""
@@ -98,6 +99,7 @@ class Pedana(BaseDocument):
 class OrdineForm(BaseModel):
     numeroOrdine: str
     agenzia: str = ""
+    trasportatore: str = ""
     mittente: str = ""
     dataConsegna: str
     note: str = ""
@@ -352,7 +354,7 @@ async def list_pedane(q: str = "", _=Depends(require_ufficio)):
     query = {}
     q = q.strip()
     if q:
-        query = {"$or": [{f: rx(q)} for f in ["numeroOrdine", "codice", "agenzia", "mittente", "destinazione", "merce"]]}
+        query = {"$or": [{f: rx(q)} for f in ["numeroOrdine", "codice", "agenzia", "trasportatore", "mittente", "destinazione", "merce"]]}
     docs = await db.pedane.find({**query, **ACTIVE}).sort("createdAt", -1).to_list(1000)
     return [Pedana.from_mongo(d) for d in docs]
 
@@ -418,7 +420,7 @@ async def create_pedane(body: CreateReq, _=Depends(require_ufficio)):
     created = []
     for p in rows:
         item = Pedana(
-            numeroOrdine=f.numeroOrdine.strip(), agenzia=f.agenzia.strip(),
+            numeroOrdine=f.numeroOrdine.strip(), agenzia=f.agenzia.strip(), trasportatore=f.trasportatore.strip(),
             mittente=(p.mittente.strip() or f.mittente.strip()), dataConsegna=f.dataConsegna,
             note=f.note.strip(), codice=p.codice.strip(), destinazione=p.destinazione.strip(),
             numeroColli=p.numeroColli.strip(), numeroPedane=p.numeroPedane.strip(), merce=p.merce.strip(),
@@ -432,7 +434,7 @@ async def create_pedane(body: CreateReq, _=Depends(require_ufficio)):
 async def update_pedana(pid: str, body: UpdateReq, _=Depends(require_ufficio)):
     f, p = body.form, body.pedana
     patch = {
-        "numeroOrdine": f.numeroOrdine.strip(), "agenzia": f.agenzia.strip(),
+        "numeroOrdine": f.numeroOrdine.strip(), "agenzia": f.agenzia.strip(), "trasportatore": f.trasportatore.strip(),
         "mittente": (p.mittente.strip() or f.mittente.strip()), "dataConsegna": f.dataConsegna,
         "note": f.note.strip(), "codice": p.codice.strip(), "destinazione": p.destinazione.strip(),
         "numeroColli": p.numeroColli.strip(), "numeroPedane": p.numeroPedane.strip(), "merce": p.merce.strip(), "ultimaRettifica": now_iso(),
@@ -505,7 +507,7 @@ async def archivio(q: str = "", skip: int = Query(0, ge=0), limit: int = Query(2
     query = {"archiviato": True}
     q = q.strip()
     if q:
-        query["$or"] = [{f: rx(q)} for f in ["numeroOrdine", "codice", "agenzia", "mittente", "destinazione", "merce"]]
+        query["$or"] = [{f: rx(q)} for f in ["numeroOrdine", "codice", "agenzia", "trasportatore", "mittente", "destinazione", "merce"]]
     total = await db.pedane.count_documents(query)
     docs = await db.pedane.find(query).sort([("dataConsegna", -1), ("numeroOrdine", 1), ("codice", 1)]).skip(skip).limit(limit).to_list(limit)
     return {"total": total, "items": [Pedana.from_mongo(d).model_dump() for d in docs]}
@@ -537,6 +539,7 @@ Rispondi SOLO con JSON valido, senza testo extra, con questa struttura esatta:
 {
   "numeroOrdine": "numero dell'ordine di trasporto (es. 25023467)",
   "agenzia": "azienda che ha emesso/commissionato l'ordine (es. KÖLLA GmbH & Co. KG)",
+  "trasportatore": "trasportatore a cui è indirizzato l'ordine, scritto IN ALTO A SINISTRA come destinatario (es. Antolini s.r.l.)",
   "dataConsegna": "data di scarico/consegna in formato YYYY-MM-DD",
   "note": "istruzioni importanti brevi (temperatura, avvisi), max 200 caratteri",
   "pedane": [
@@ -594,6 +597,7 @@ async def import_pdf(file: UploadFile = File(...), _=Depends(require_ufficio)):
     return {
         "numeroOrdine": str(parsed.get("numeroOrdine", "") or "").strip(),
         "agenzia": str(parsed.get("agenzia", "") or "").strip(),
+        "trasportatore": str(parsed.get("trasportatore", "") or "").strip(),
         "mittente": str(parsed.get("mittente", "") or "").strip(),
         "dataConsegna": str(parsed.get("dataConsegna", "") or "").strip(),
         "note": str(parsed.get("note", "") or "").strip(),

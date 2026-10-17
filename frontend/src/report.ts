@@ -2,7 +2,7 @@ import { Platform } from "react-native";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 
-import { formatDate, Pedana } from "@/src/api";
+import { formatDate, isTrasbordo, Pedana } from "@/src/api";
 
 const esc = (s: string | null | undefined) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
@@ -40,7 +40,7 @@ function buildHtml(dataIso: string, list: Pedana[], cooperativa: string) {
             <td>${esc(ora(when))}</td><td>${esc(who)}</td><td>${esc(p.noteParziale)}</td></tr>`;
         })
         .join("");
-      return `<h2>Ordine ${esc(g.numero)} <small>${esc(g.items[0].agenzia)} · scaricate ${d}/${g.items.length}</small></h2>
+      return `<h2>Ordine ${esc(g.numero)} <small>${esc(g.items[0].agenzia)}${isTrasbordo(g.items[0].trasportatore) ? ` · <b style="color:#D97706">TRASBORDO ${esc(g.items[0].trasportatore)}</b>` : ""} · scaricate ${d}/${g.items.length}</small></h2>
         <table><thead><tr><th>Posizione</th><th>Mittente</th><th>Merce</th><th>Pedane</th><th>Colli</th><th>Destinazione</th><th>Stato</th><th>Ora</th><th>Operatore</th><th>Note</th></tr></thead><tbody>${body}</tbody></table>`;
     })
     .join("");

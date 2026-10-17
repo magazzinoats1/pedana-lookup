@@ -1,0 +1,32 @@
+{
+  "summary": "Verified trasportatore / TRASBORDO feature end-to-end. Backend (pytest, 5/5 PASS): POST /api/pedane persists form.trasportatore on every created pedana; PUT /api/pedane/{id} updates it and GET confirms; GET /api/pedane?q=<carrier> finds via trasportatore substring (field included in search $or); POST /api/import-pdf on the sample PDF returns trasportatore containing 'Antolini' (actual: 'Antolini s.r.l.'). Frontend (Playwright, 390x844): form-trasportatore-input prefilled 'Antolini Trasporti', no form-trasbordo-warning initially; form-trasportatore-altro-chip clears the field; typing 'TEST Trasporti Rossi' shows form-trasbordo-warning; form-trasportatore-antolini-chip restores default and hides warning; saving a TRASBORDO order persists; ufficio-trasbordo-{id} chip appears with text 'TRASBORDO · TEST Autotrasp Rossi'; magazzino-trasbordo-{numero} appears on magazzino list; riepilogo-trasbordo-{numero} appears for dataConsegna=today; edit mode re-loads trasportatore ('TEST Autotrasp Rossi') and shows the warning. Antolini orders show NO trasbordo badge (0 chips before create, exactly 1 after creating one TEST trasbordo order). No layout overflow at 390x844 (documentElement.scrollWidth=390). Note: 'pedana-detail-trasportatore' (PedanaDetail tile) is rendered only inside the magazziniere scan/open-pedana modal; code review confirms label 'TRASBORDO' + value fallback 'Antolini Trasporti' and correct testID. All TEST data cleaned up (DELETE /api/pedane/{id} 200).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_trasportatore.py",
+    "/app/test_reports/pytest/pytest_trasportatore.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py:357 — trasportatore included in list_pedane $or search fields. OK.",
+    "server.py:423,437 — form.trasportatore persisted on both create and update paths. OK.",
+    "server.py:542 — PDF prompt explicitly instructs the model to extract the top-left destinatario as trasportatore ('es. Antolini s.r.l.'). Verified live: returns 'Antolini s.r.l.' on the sample PDF.",
+    "form.tsx:69,146 — on load / after PDF import, trasportatore defaults to TRASPORTATORE_DEFAULT when backend/PDF returns empty, so legacy pedane without the field show as Antolini (no badge). Correct per spec.",
+    "PedanaDetail.tsx:64-67 — label switches between 'TRASPORTATORE' and 'TRASBORDO' via isTrasbordo(); icon swap-horizontal-bold for trasbordo. testID stable.",
+    "ufficio/index.tsx:106, magazzino.tsx:344, riepilogo.tsx:159 — chips/badges all gated by isTrasbordo(trasportatore). Antolini orders correctly omit the badge."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_trasportatore.py (NEW)"
+  ],
+  "success_rate": {"backend": "100% (5/5)", "frontend": "100% of testable flows"},
+  "seed_data_creation": "Backend pytest created 4 TEST pedane (TEST-TRASP-ANT-001 x2, TEST-TRASP-TRASB-002, TEST-PUT-003, TEST-SEARCH-004) and the module cleanup fixture deleted them. Frontend run created 1 TEST pedana (TEST-UITRB229200 / TEST-COD-229200) — deleted via API after test. Real data untouched.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "The 'pedana-detail-trasportatore' tile only renders inside PedanaDetail modal, which is reachable from the Magazziniere scan/scarico flow (requires creating a magazziniere + PIN or using one already seeded). To test it UI-wise, log in as ufficio to create a magazziniere, log in /magazzino with that PIN, scan/search the codice, then open the pedana — the tile should show label 'TRASBORDO' for a trasbordo pedana. Code review confirmed correctness. On Expo web, Pressable sometimes doesn't fire from Playwright .click(force=True); workaround used here: dispatch pointerdown/mousedown/pointerup/mouseup/click via page.evaluate (see helper `tap(sel)` in the browser automation script). Also, the ufficio login button can be below the viewport once the keyboard is simulated — press 'Enter' in the password input to submit instead.",
+  "rca_of_issue": "N/A — feature implemented correctly across backend persistence, PDF extraction, and all three UI surfaces (ufficio list, magazzino groups, riepilogo). isTrasbordo(trasportatore) is the single predicate used everywhere, so Antolini vs non-Antolini classification is consistent."
+}
