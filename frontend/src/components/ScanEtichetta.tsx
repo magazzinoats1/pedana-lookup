@@ -12,7 +12,7 @@ import { uploadForm } from "@/src/utils/upload";
 
 type Candidato = { codice: string; pedane: number };
 
-export function ScanEtichetta({ onCode }: { onCode: (code: string) => void }) {
+export function ScanEtichetta({ onCode, big }: { onCode: (code: string) => void; big?: boolean }) {
   const [perm, setPerm] = useState<"none" | "ask" | "blocked">("none");
   const [reading, setReading] = useState(false);
   const [scelte, setScelte] = useState<Candidato[] | null>(null);
@@ -69,9 +69,19 @@ export function ScanEtichetta({ onCode }: { onCode: (code: string) => void }) {
 
   return (
     <>
-      <Pressable onPress={avvia} disabled={reading} hitSlop={6} style={({ pressed }) => [styles.btn, pressed && { opacity: 0.8 }]} testID="magazzino-scan-button">
-        <MaterialDesignIcons name="camera-outline" size={26} color={colors.onBrandPrimary} />
-      </Pressable>
+      {big ? (
+        <Pressable onPress={avvia} disabled={reading} style={({ pressed }) => [styles.bigBtn, pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] }]} testID="magazzino-scan-button">
+          <MaterialDesignIcons name="camera" size={30} color={colors.onBrandSecondary} />
+          <View style={styles.bigTextWrap}>
+            <Text style={styles.bigTitle}>Fotografa la posizione</Text>
+            <Text style={styles.bigSub}>Scatta al cartello e vedi dove va la merce</Text>
+          </View>
+        </Pressable>
+      ) : (
+        <Pressable onPress={avvia} disabled={reading} hitSlop={6} style={({ pressed }) => [styles.btn, pressed && { opacity: 0.8 }]} testID="magazzino-scan-button">
+          <MaterialDesignIcons name="camera-outline" size={26} color={colors.onBrandPrimary} />
+        </Pressable>
+      )}
 
       <Modal visible={reading} transparent animationType="fade">
         <View style={styles.overlay} testID="scan-reading-overlay">
@@ -128,6 +138,10 @@ export function ScanEtichetta({ onCode }: { onCode: (code: string) => void }) {
 
 const useStyles = makeStyles((c) => ({
   btn: { width: 52, height: 52, borderRadius: 12, backgroundColor: c.brandSecondary, alignItems: "center", justifyContent: "center" },
+  bigBtn: { minHeight: 60, borderRadius: 14, backgroundColor: c.brandSecondary, flexDirection: "row", alignItems: "center", gap: 14, paddingHorizontal: 16, marginTop: 10 },
+  bigTextWrap: { flex: 1 },
+  bigTitle: { fontFamily: fonts.textBold, fontSize: 17, color: c.onBrandSecondary },
+  bigSub: { fontFamily: fonts.textMedium, fontSize: 12, color: c.onBrandSecondary, opacity: 0.85 },
   overlay: { flex: 1, backgroundColor: c.scrim, alignItems: "center", justifyContent: "center" },
   readingBox: { backgroundColor: c.surfaceSecondary, borderRadius: 16, padding: 24, alignItems: "center", gap: 12, minWidth: 220 },
   readingText: { fontFamily: fonts.textBold, fontSize: 16, color: c.onSurface },

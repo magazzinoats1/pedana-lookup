@@ -194,8 +194,8 @@ export default function Magazzino() {
               <MaterialDesignIcons name="close-circle" size={26} color={colors.muted} />
             </Pressable>
           )}
-          <ScanEtichetta onCode={setQ} />
         </View>
+        <ScanEtichetta big onCode={setQ} />
       </View>
       <View style={styles.chipWrap}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRowContent} keyboardShouldPersistTaps="handled">

@@ -1,0 +1,27 @@
+{
+  "summary": "Verified new BIG scan button on Magazzino. magazzino-scan-button renders below magazzino-search-input at viewport 390x844 (x=16, width=358, height=60, y=221 after y=154 search input) with no horizontal overflow; title 'Fotografa la posizione' and subtitle 'Scatta al cartello e vedi dove va la merce' present. Search input + magazzino-search-clear-button still visible. Both filter chip rows (magazzino-date-filter-* and magazzino-filter-*) remain visible below. Tap flow: on web, camera permission is auto-granted so launchCameraAsync opens the native file chooser directly (expected). Uploaded the real handwritten photo (https://customer-assets-0z36b82j.emergentagent.net/.../04a42fbd6dd68c3d_...webp). scan-reading-overlay became visible, POST /api/scan-etichetta returned, magazzino-search-input became exactly '2619-019331' and toast 'Letto: 2619-019331' shown. Because the position has 2 merci merged into a single position for order 25023487, pedana-detail-card auto-opened and pedana-detail-destinazione prominently shows 'Peter Brozulat GmbH - München'. All assertions passed; no red screen; no new errors. Only the previously-reported RN warning (props.pointerEvents) was logged.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "props.pointerEvents", "issue": "Console warning: props.pointerEvents is deprecated. Use style.pointerEvents. Already reported in iteration_17; still present. Non-blocking."}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Optional: migrate pointerEvents prop to style.pointerEvents to silence RN deprecation warning (same as iteration 17)."
+  ],
+  "critical_code_review_comments": [
+    "ScanEtichetta.tsx avvia(): on web ImagePicker.getCameraPermissionsAsync returns granted=true, so scan button opens the file chooser directly without showing scan-permission-sheet. This matches the Expo web behavior and the test flow still works. The permission sheet with scan-allow-camera-button / scan-gallery-button will appear on native builds where permission is not yet granted.",
+    "Big button layout is correct: minHeight 60, borderRadius 14, marginTop 10, flexDirection row with icon + title/sub text. No overflow at 390 width (full-width minus 32px of parent padding)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "None. Read-only test against real production data (position 2619-019331, order 25023487, 2 merci merged).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "On web, tapping magazzino-scan-button opens the file chooser directly (no scan-permission-sheet) because ImagePicker reports camera permission as granted. To test, use page.expect_file_chooser() before clicking, then set_files to a local image file. Real position 2619-019331 belongs to order 25023487 with destination 'Peter Brozulat GmbH - München' and has 2 merged merci on that single position so pedana-detail-card auto-opens after scan.",
+  "rca_of_issue": "N/A - feature verified working end-to-end as specified."
+}
