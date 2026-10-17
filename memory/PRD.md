@@ -31,6 +31,7 @@ User uploaded a KÖLLA transport-order PDF and a reference web app (GestioneLogi
 - Archivio automatico: orders fully completo with last dataConsegna > 30 days archived hourly (archiviato flag), hidden from lists; /ufficio/archivio with search, pagination, 'Archivia ora', 'Ripristina'
 - Scansione etichette (Magazzino): camera button next to search → photo (expo-image-picker) → POST /api/scan-etichetta (Gemini reads printed codes) → fills search; choice sheet when several codes; permission flow with Apri impostazioni + gallery fallback; prompt tuned for HANDWRITTEN, different signs (verified on Il Galletto sign 2619-019331, 3/3 reads)
 - Magazzino default view = 'Da scaricare' (pedane in attesa, not yet arrived) with banner count; typing/scanning a search switches to Tutte, clearing returns to Da scaricare
+- Avviso ritardi: pedane in attesa with dataConsegna < today, or today after 14:00 local, flagged 'In ritardo' (red pill + banner in Magazzino, stat + row label in Riepilogo) — src/ritardi.ts
 - Security audit run: SEC-001 default office password (change it), SEC-002 wildcard CORS, hardening: login rate limit, PDF size cap
 
 ## Backlog

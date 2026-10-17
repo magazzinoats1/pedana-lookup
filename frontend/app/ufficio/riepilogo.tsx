@@ -10,6 +10,7 @@ import { statoColor } from "@/src/components/PedanaDetail";
 import { useToast } from "@/src/components/Toast";
 import { Button, IconButton } from "@/src/components/ui";
 import { condividiReport, groupOrders, ora } from "@/src/report";
+import { inRitardo } from "@/src/ritardi";
 import { fonts, makeStyles, useTheme } from "@/src/theme";
 import { storage } from "@/src/utils/storage";
 
@@ -125,6 +126,7 @@ export default function Riepilogo() {
             <Stat label="Scaricate" value={String(done)} icon="check-circle-outline" tone={colors.success} testID="riepilogo-stat-scaricate" />
             <Stat label="Parziali" value={String(parz)} icon="circle-half-full" tone={colors.warning} testID="riepilogo-stat-parziali" />
             <Stat label="In attesa" value={String(list.length - done - parz)} icon="clock-outline" tone={colors.brandSecondary} testID="riepilogo-stat-attesa" />
+            <Stat label="In ritardo" value={String(list.filter((p) => inRitardo(p)).length)} icon="clock-alert-outline" tone={colors.error} testID="riepilogo-stat-ritardo" />
           </View>
 
           {list.length > 0 && (
@@ -178,7 +180,9 @@ export default function Riepilogo() {
                           </Text>
                         </View>
                         <View style={styles.rowRight}>
-                          <Text style={[styles.rowStato, { color: sc }]}>{STATO[p.statoArrivo]}</Text>
+                          <Text style={[styles.rowStato, { color: inRitardo(p) ? colors.error : sc }]} testID={inRitardo(p) ? `riepilogo-ritardo-${p.id}` : undefined}>
+                            {inRitardo(p) ? "In ritardo" : STATO[p.statoArrivo]}
+                          </Text>
                           {!!when && (
                             <Text style={styles.rowWho} numberOfLines={1}>
                               {ora(when)}

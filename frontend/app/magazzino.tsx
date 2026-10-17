@@ -11,6 +11,7 @@ import { storage } from "@/src/utils/storage";
 import { AppHeader } from "@/src/components/AppHeader";
 import { PedanaDetail, statoColor } from "@/src/components/PedanaDetail";
 import { ScanEtichetta } from "@/src/components/ScanEtichetta";
+import { inRitardo, ORA_RITARDO } from "@/src/ritardi";
 import { Sheet } from "@/src/components/Sheet";
 import { useToast } from "@/src/components/Toast";
 import { Button, Field, IconButton } from "@/src/components/ui";
@@ -299,6 +300,21 @@ export default function Magazzino() {
           </View>
         ) : (
           <View style={styles.gap}>
+            {(() => {
+              const late = dateFiltered.filter((p) => inRitardo(p));
+              if (!late.length || q.trim()) return null;
+              return (
+                <View style={styles.lateBanner} testID="magazzino-ritardi-banner">
+                  <MaterialDesignIcons name="clock-alert-outline" size={28} color={colors.error} />
+                  <View style={styles.flex}>
+                    <Text style={styles.lateTitle} testID="magazzino-ritardi-count">
+                      {late.length} pedan{late.length === 1 ? "a" : "e"} in ritardo
+                    </Text>
+                    <Text style={styles.lateSub}>Previste per oggi (dopo le {ORA_RITARDO}:00) o giorni passati e non ancora arrivate</Text>
+                  </View>
+                </View>
+              );
+            })()}
             {filtro === "attesa" && !q.trim() && (
               <View style={styles.daBanner} testID="magazzino-da-scaricare-banner">
                 <MaterialDesignIcons name="truck-alert-outline" size={28} color={colors.brandSecondary} />
@@ -348,7 +364,14 @@ export default function Magazzino() {
                         <View style={styles.flex}>
                           <View style={styles.itemTop}>
                             <Text style={styles.resCode}>{p.codice}</Text>
-                            <Text style={[styles.itemStato, { color: sc }]}>{STATO_LABEL[p.statoArrivo]}</Text>
+                            {inRitardo(p) ? (
+                              <View style={styles.latePill} testID={`magazzino-ritardo-${p.id}`}>
+                                <MaterialDesignIcons name="clock-alert-outline" size={14} color={colors.onError} />
+                                <Text style={styles.latePillText}>In ritardo</Text>
+                              </View>
+                            ) : (
+                              <Text style={[styles.itemStato, { color: sc }]}>{STATO_LABEL[p.statoArrivo]}</Text>
+                            )}
                           </View>
                           <Text style={styles.resMerce} numberOfLines={1}>{[p.merce, p.destinazione].filter(Boolean).join(" · ")}</Text>
                           <Text style={styles.resMeta} numberOfLines={1}>
@@ -501,6 +524,11 @@ const useStyles = makeStyles((c) => ({
   opPillWarn: { backgroundColor: c.warningTint, borderWidth: 1.5, borderColor: c.warning },
   opText: { fontFamily: fonts.textBold, fontSize: 14, color: c.onBrandTertiary, flexShrink: 1 },
   readonlyHint: { fontFamily: fonts.textSemi, fontSize: 12, color: c.onWarningTint, marginBottom: 4 },
+  lateBanner: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: c.errorTint, borderRadius: 12, padding: 14, borderWidth: 1.5, borderColor: c.error },
+  lateTitle: { fontFamily: fonts.display, fontSize: 24, color: c.error },
+  lateSub: { fontFamily: fonts.textMedium, fontSize: 12, color: c.onSurfaceTertiary },
+  latePill: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: c.error, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
+  latePillText: { fontFamily: fonts.textBold, fontSize: 12, color: c.onError },
   daBanner: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: c.brandTertiary, borderRadius: 12, padding: 14, borderWidth: 1.5, borderColor: c.brandSecondary },
   daTitle: { fontFamily: fonts.display, fontSize: 24, color: c.brandPrimary },
   daSub: { fontFamily: fonts.textMedium, fontSize: 13, color: c.onSurfaceTertiary },

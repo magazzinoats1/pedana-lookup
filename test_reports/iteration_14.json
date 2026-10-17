@@ -1,0 +1,24 @@
+{
+  "summary": "Tested 'Avviso Ritardi' feature end-to-end. All acceptance criteria pass: Magazzino shows red banner with correct 'N pedane in ritardo' count, red 'In ritardo' pill replaces stato label for late rows, future (tomorrow) rows stay normal 'In attesa'. Banner correctly hidden while searching and restored on clear. 'Oggi' filter respected ORA_RITARDO=14 (server hour=8 at test time, so no false-positive late for today). Riepilogo Ufficio shows 6 stat tiles including new 'In ritardo' tile; prev-day navigation reaches yesterday where TEST order correctly counted and marked with 'riepilogo-ritardo-{id}' pill. No horizontal overflow at 390x844 (scrollWidth==clientWidth==390). Full lifecycle: created 3 TEST pedane via POST /api/pedane (ufficio Bearer), verified in UI, then DELETE cleanup (all 200). No real data mutated.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": ["Inline Playwright script executed via mcp_browser_automation; screenshots at /tmp/magazzino_ritardi.png and /tmp/riepilogo_yesterday.png"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "ritardi.ts correctly uses local-time ISO date (not UTC) via getFullYear/getMonth/getDate — avoids TZ off-by-one.",
+    "Both magazzino.tsx and ufficio/riepilogo.tsx reuse inRitardo() → single source of truth. Good.",
+    "Not tested with clock override: today≥14 scenario (would need page.clock install_fake_timers). Current logic matches spec by inspection; low risk."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "Created 2 TEST pedane with dataConsegna=yesterday (TEST-RIT-Y-01/02 under order TEST-RIT-Y) and 1 TEST pedana with dataConsegna=tomorrow (TEST-RIT-T-01 under order TEST-RIT-T) via POST /api/pedane. All 3 deleted after test (DELETE 200).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Avviso Ritardi feature verified. Observed counts during test (useful baseline): magazzino total late=33 (all dates), riepilogo yesterday late=12. These include real DB rows plus the 2 TEST ones; counts will differ in future runs as real data drifts. Server local hour at test = 8 (< ORA_RITARDO=14), so today's attesa rows were NOT flagged late — consistent with spec.",
+  "rca_of_issue": "N/A — no bugs found."
+}
