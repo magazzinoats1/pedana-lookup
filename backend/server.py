@@ -447,19 +447,36 @@ async def update_pedana(pid: str, body: UpdateReq, _=Depends(require_ufficio)):
 
 @api.patch("/pedane/{pid}/stato", response_model=Pedana)
 async def update_stato(pid: str, body: StatoReq, w=Depends(require_magazziniere)):
-    operatore = w["nome"]
     doc = await db.pedane.find_one({"id": pid})
     if not doc:
         raise HTTPException(status_code=404, detail="Pedana non trovata")
-    if body.stato == "completo":
-        patch = {"statoArrivo": "completo", "arrivoCompletoAt": now_iso(), "arrivoCompletoDa": operatore}
-    elif body.stato == "parziale":
-        patch = {"statoArrivo": "parziale", "arrivoParzialeAt": now_iso(), "noteParziale": body.noteParziale.strip(), "arrivoParzialeDa": operatore}
-    else:
-        patch = {"statoArrivo": "attesa", "arrivoParzialeAt": None, "arrivoCompletoAt": None, "noteParziale": "",
-                 "arrivoParzialeDa": "", "arrivoCompletoDa": ""}
-    res = await db.pedane.find_one_and_update({"id": pid}, {"$set": patch}, return_document=True)
+    res = await db.pedane.find_one_and_update({"id": pid}, {"$set": stato_patch(body, w["nome"])}, return_document=True)
     return Pedana.from_mongo(res)
+
+
+def stato_patch(body: StatoReq, operatore: str) -> dict:
+    if body.stato == "completo":
+        return {"statoArrivo": "completo", "arrivoCompletoAt": now_iso(), "arrivoCompletoDa": operatore}
+    if body.stato == "parziale":
+        return {"statoArrivo": "parziale", "arrivoParzialeAt": now_iso(), "noteParziale": body.noteParziale.strip(), "arrivoParzialeDa": operatore}
+    return {"statoArrivo": "attesa", "arrivoParzialeAt": None, "arrivoCompletoAt": None, "noteParziale": "",
+            "arrivoParzialeDa": "", "arrivoCompletoDa": ""}
+
+
+class PosizioneStatoReq(StatoReq):
+    numeroOrdine: str = Field(min_length=1)
+    codice: str = Field(min_length=1)
+
+
+@api.patch("/posizioni/stato", response_model=List[Pedana])
+async def update_stato_posizione(body: PosizioneStatoReq, w=Depends(require_magazziniere)):
+    q = {"numeroOrdine": body.numeroOrdine.strip(),
+         "codice": {"$regex": f"^{re.escape(body.codice.strip())}$", "$options": "i"}}
+    res = await db.pedane.update_many(q, {"$set": stato_patch(body, w["nome"])})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Posizione non trovata")
+    docs = await db.pedane.find(q).to_list(100)
+    return [Pedana.from_mongo(d) for d in docs]
 
 
 @api.post("/ordini/scarica")

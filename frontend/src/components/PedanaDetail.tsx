@@ -14,11 +14,13 @@ export function statoColor(stato: string, colors: ReturnType<typeof useTheme>["c
 
 export function PedanaDetail({
   pedana,
+  items,
   onUpdated,
   operatore,
   onRequestName,
 }: {
   pedana: Pedana;
+  items?: Pedana[];
   onUpdated: (p: Pedana) => void;
   operatore: string | null;
   onRequestName: () => void;
@@ -43,15 +45,29 @@ export function PedanaDetail({
         </View>
       </View>
 
-      {!!pedana.merce && (
-        <View style={styles.merceBox}>
-          <Text style={styles.smallLabel}>TIPO MERCE</Text>
-          <Text style={styles.merce} testID="pedana-detail-merce">{pedana.merce}</Text>
+      {items && items.length > 1 ? (
+        <View style={styles.merceBox} testID="pedana-detail-merce-list">
+          <Text style={styles.smallLabel}>{items.length} MERCI SU QUESTA POSIZIONE · si scaricano insieme</Text>
+          {items.map((it) => (
+            <View key={it.id} style={styles.merceRow} testID={`pedana-detail-merce-item-${it.id}`}>
+              <Text style={styles.merceItem} numberOfLines={2}>{it.merce || "—"}</Text>
+              <Text style={styles.merceQty}>
+                {[it.numeroPedane ? `${it.numeroPedane} ped.` : "", it.numeroColli ? `${it.numeroColli} colli` : ""].filter(Boolean).join(" · ")}
+              </Text>
+            </View>
+          ))}
         </View>
+      ) : (
+        !!pedana.merce && (
+          <View style={styles.merceBox}>
+            <Text style={styles.smallLabel}>TIPO MERCE</Text>
+            <Text style={styles.merce} testID="pedana-detail-merce">{pedana.merce}</Text>
+          </View>
+        )
       )}
 
       <View style={styles.section}>
-        <StatoToggle pedana={pedana} onUpdated={onUpdated} operatore={operatore} onRequestName={onRequestName} />
+        <StatoToggle pedana={pedana} items={items} onUpdated={onUpdated} operatore={operatore} onRequestName={onRequestName} />
       </View>
 
       <View style={styles.grid}>
@@ -95,6 +111,9 @@ const useStyles = makeStyles((c) => ({
   order: { fontFamily: fonts.display, fontSize: 24, color: c.brandPrimary },
   section: {},
   merceBox: { backgroundColor: c.brandTertiary, borderRadius: 10, padding: 12 },
+  merceRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingTop: 8, marginTop: 6, borderTopWidth: 1, borderTopColor: c.border },
+  merceItem: { flex: 1, fontFamily: fonts.textBold, fontSize: 16, color: c.onBrandTertiary },
+  merceQty: { fontFamily: fonts.textSemi, fontSize: 13, color: c.onSurfaceTertiary },
   merce: { fontFamily: fonts.textBold, fontSize: 17, color: c.onBrandTertiary, marginTop: 2 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   note: { flexDirection: "row", gap: 8, backgroundColor: c.warningTint, borderRadius: 10, padding: 12 },

@@ -8,9 +8,9 @@ import { useToast } from "@/src/components/Toast";
 import { Button } from "@/src/components/ui";
 import { fonts, makeStyles, useTheme } from "@/src/theme";
 
-type Props = { pedana: Pedana; onUpdated: (p: Pedana) => void; operatore: string | null; onRequestName: () => void };
+type Props = { pedana: Pedana; items?: Pedana[]; onUpdated: (p: Pedana) => void; operatore: string | null; onRequestName: () => void };
 
-export function StatoToggle({ pedana, onUpdated, operatore, onRequestName }: Props) {
+export function StatoToggle({ pedana, items, onUpdated, operatore, onRequestName }: Props) {
   const [showParziale, setShowParziale] = useState(false);
   const [note, setNote] = useState(pedana.noteParziale || "");
   const [busy, setBusy] = useState(false);
@@ -22,9 +22,18 @@ export function StatoToggle({ pedana, onUpdated, operatore, onRequestName }: Pro
   async function update(s: Stato, noteParziale = "") {
     setBusy(true);
     try {
-      const p = await api<Pedana>(`/pedane/${pedana.id}/stato`, { method: "PATCH", body: { stato: s, noteParziale }, auth: "magazzino" });
+      if (items && items.length > 1) {
+        const list = await api<Pedana[]>("/posizioni/stato", {
+          method: "PATCH",
+          body: { numeroOrdine: pedana.numeroOrdine, codice: pedana.codice, stato: s, noteParziale },
+          auth: "magazzino",
+        });
+        list.forEach(onUpdated);
+      } else {
+        const p = await api<Pedana>(`/pedane/${pedana.id}/stato`, { method: "PATCH", body: { stato: s, noteParziale }, auth: "magazzino" });
+        onUpdated(p);
+      }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      onUpdated(p);
       setShowParziale(false);
       if (s === "attesa") setNote("");
       toast(s === "completo" ? "Scarico completo registrato" : s === "parziale" ? "Arrivo parziale registrato" : "Stato annullato");

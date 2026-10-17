@@ -1,0 +1,32 @@
+{
+  "summary": "Tested merged-position feature end-to-end. Backend: 6/6 pytest cases passed for PATCH /api/posizioni/stato covering 401 (no token), 403 (office token), 404 (unknown position), case-insensitive matching that updates ALL pedane with same numeroOrdine+codice (worker name stamped), isolation (different codice in same order and same codice in different order are NOT touched), annulla reset, and parziale with note. Frontend: merged UI verified at viewport 390x844 - search auto-opens detail card listing both merci (pedana-detail-merce-list with 2 items), group summary shows '2 posizioni · 3 pedane · 188 colli' with merged row's n°pedane=2 and n°colli=168, 'magazzino-multi-merce-{id}' pill shows '2 merci'; worker login flow works; tapping stato-segna-completo-button once sets both pedane to completo with 'da {worker}' label; stato-annulla-button resets both back to attesa.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "props.pointerEvents", "issue": "Console warning: props.pointerEvents is deprecated. Use style.pointerEvents (RN deprecation). Not blocking, but should migrate. Likely in Sheet/overlay component."}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_posizioni_stato.py",
+    "/app/test_reports/pytest/pytest_posizioni_stato.xml"
+  ],
+  "action_items": [
+    "Optional: migrate pointerEvents prop to style.pointerEvents to silence RN deprecation warning"
+  ],
+  "critical_code_review_comments": [
+    "PATCH /api/posizioni/stato uses case-insensitive regex for codice but exact (case-sensitive) match for numeroOrdine - matches frontend mergePositions key which lowercases only codice. Correct behavior.",
+    "mergePositions key uses codice.trim().toLowerCase() which aligns with backend regex ^codice$ case-insensitive match."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_posizioni_stato.py (new)"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "Created and deleted (within tests + manual UI seed): TEST order TESTDED37A with 3 pedane, a second TEST order sharing codice (backend test only), and TEST worker TEST_UI_a0f8/TEST_W_* with PIN 1234. All test data cleaned up afterward.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Default Magazzino filter is 'Da scaricare' (attesa) and switches to 'Tutte' when searching. When a search yields exactly one merged position (same numeroOrdine+codice), the detail card auto-opens. PATCH /api/posizioni/stato endpoint takes {numeroOrdine, codice, stato, noteParziale} with Bearer magazzino token and returns List[Pedana].",
+  "rca_of_issue": "N/A - feature verified working as specified."
+}

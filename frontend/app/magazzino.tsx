@@ -12,6 +12,7 @@ import { AppHeader } from "@/src/components/AppHeader";
 import { PedanaDetail, statoColor } from "@/src/components/PedanaDetail";
 import { ScanEtichetta } from "@/src/components/ScanEtichetta";
 import { inRitardo, ORA_RITARDO } from "@/src/ritardi";
+import { mergePositions } from "@/src/posizioni";
 import { Sheet } from "@/src/components/Sheet";
 import { useToast } from "@/src/components/Toast";
 import { Button, Field, IconButton } from "@/src/components/ui";
@@ -145,7 +146,8 @@ export default function Magazzino() {
       setScaricando(false);
     }
   }
-  const selected = q.trim() && results.length === 1 ? results[0] : results.find((r) => r.id === selectedId) ?? null;
+  const allPos = groupByOrder(results).flatMap((g) => mergePositions(g.items));
+  const selected = (q.trim() && allPos.length === 1 ? allPos[0] : allPos.find((x) => x.key === selectedId)) ?? null;
   const onUpdated = (p: Pedana) => setResults((rs) => rs.map((r) => (r.id === p.id ? p : r)));
 
   return (
@@ -296,7 +298,7 @@ export default function Magazzino() {
                 <Text style={styles.backText}>{q.trim() ? `Torna ai ${results.length} risultati` : "Torna alla lista merce"}</Text>
               </Pressable>
             )}
-            <PedanaDetail key={selected.id} pedana={selected} onUpdated={onUpdated} operatore={operatore} onRequestName={operatore ? sessioneScaduta : apriNome} />
+            <PedanaDetail key={selected.key} pedana={selected.rep} items={selected.items} onUpdated={onUpdated} operatore={operatore} onRequestName={operatore ? sessioneScaduta : apriNome} />
           </View>
         ) : (
           <View style={styles.gap}>
@@ -347,7 +349,7 @@ export default function Magazzino() {
                         </View>
                       )}
                       <Text style={styles.groupMeta} numberOfLines={1} testID={`magazzino-group-summary-${g.numero}`}>
-                        {formatDate(g.items[0].dataConsegna)} · {g.items.length} posizion{g.items.length === 1 ? "e" : "i"}{pal ? ` · ${pal} pedane` : ""}{colli ? ` · ${colli} colli` : ""}
+                        {formatDate(g.items[0].dataConsegna)} · {mergePositions(g.items).length} posizion{mergePositions(g.items).length === 1 ? "e" : "i"}{pal ? ` · ${pal} pedane` : ""}{colli ? ` · ${colli} colli` : ""}
                       </Text>
                     </View>
                     <View style={[styles.countPill, complete && styles.countPillDone]} testID={complete ? `magazzino-ordine-completo-${g.numero}` : undefined}>
@@ -357,19 +359,26 @@ export default function Magazzino() {
                       </Text>
                     </View>
                   </View>
-                  {g.items.map((p) => {
+                  {mergePositions(g.items).map(({ key, rep: p, items: its }) => {
                     const sc = statoColor(p.statoArrivo, colors);
                     return (
                       <Pressable
-                        key={p.id}
+                        key={key}
                         testID={`magazzino-result-${p.id}`}
-                        onPress={() => setSelectedId(p.id)}
+                        onPress={() => setSelectedId(key)}
                         style={({ pressed }) => [styles.item, pressed && { backgroundColor: colors.surfaceTertiary }]}
                       >
                         <View style={[styles.itemBar, { backgroundColor: sc }]} />
                         <View style={styles.flex}>
                           <View style={styles.itemTop}>
-                            <Text style={styles.resCode}>{p.codice}</Text>
+                            <View style={styles.codeWrap}>
+                              <Text style={styles.resCode}>{p.codice}</Text>
+                              {its.length > 1 && (
+                                <View style={styles.multiPill} testID={`magazzino-multi-merce-${p.id}`}>
+                                  <Text style={styles.multiPillText}>{its.length} merci</Text>
+                                </View>
+                              )}
+                            </View>
                             {inRitardo(p) ? (
                               <View style={styles.latePill} testID={`magazzino-ritardo-${p.id}`}>
                                 <MaterialDesignIcons name="clock-alert-outline" size={14} color={colors.onError} />
@@ -533,6 +542,9 @@ const useStyles = makeStyles((c) => ({
   lateBanner: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: c.errorTint, borderRadius: 12, padding: 14, borderWidth: 1.5, borderColor: c.error },
   lateTitle: { fontFamily: fonts.display, fontSize: 24, color: c.error },
   lateSub: { fontFamily: fonts.textMedium, fontSize: 12, color: c.onSurfaceTertiary },
+  codeWrap: { flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 1 },
+  multiPill: { backgroundColor: c.brandSecondary, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
+  multiPillText: { fontFamily: fonts.textBold, fontSize: 11, color: c.onBrandSecondary },
   latePill: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: c.error, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
   latePillText: { fontFamily: fonts.textBold, fontSize: 12, color: c.onError },
   trasbordoChip: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-start", backgroundColor: c.warning, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2, marginVertical: 2, maxWidth: "100%" },

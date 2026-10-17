@@ -33,6 +33,7 @@ User uploaded a KÖLLA transport-order PDF and a reference web app (GestioneLogi
 - Magazzino default view = 'Da scaricare' (pedane in attesa, not yet arrived) with banner count; typing/scanning a search switches to Tutte, clearing returns to Da scaricare
 - Avviso ritardi: ONLY pedane in attesa due TODAY after 14:00 local (past days not highlighted), flagged 'In ritardo' (red pill + banner in Magazzino, stat + row label in Riepilogo) — src/ritardi.ts
 - Trasportatore per order (default 'Antolini Trasporti', PDF top-left addressee); not Antolini => TRASBORDO badge in Ufficio list, Magazzino groups, detail, Riepilogo, report
+- Same position + same order with different merce merged into ONE row in Magazzino ('N merci' pill); detail lists each merce; marking stato applies to all via PATCH /api/posizioni/stato
 - Security audit run: SEC-001 default office password (change it), SEC-002 wildcard CORS, hardening: login rate limit, PDF size cap
 
 ## Backlog
