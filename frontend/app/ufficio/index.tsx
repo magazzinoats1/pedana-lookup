@@ -118,6 +118,7 @@ export default function Ufficio() {
             <Meta label="MITTENTE" value={o.mittente} />
             <Meta label="DATA" value={formatDate(o.dataConsegna)} />
             {!!o.numeroColli && <Meta label="COLLI" value={o.numeroColli} />}
+            {!!o.numeroPedane && <Meta label="PEDANE" value={o.numeroPedane} />}
             {!!o.agenzia && <Meta label="AGENZIA" value={o.agenzia} />}
           </View>
           {!!o.note && <Text style={styles.note} numberOfLines={2}>{o.note}</Text>}

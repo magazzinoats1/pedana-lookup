@@ -16,6 +16,7 @@ export type Pedana = {
   codice: string;
   destinazione: string;
   numeroColli: string;
+  numeroPedane?: string;
   merce: string;
   createdAt: string;
   ultimaRettifica: string | null;
@@ -35,7 +36,7 @@ export type OrdineForm = {
   note: string;
 };
 
-export type PedanaRow = { codice: string; destinazione: string; numeroColli: string; mittente: string; merce: string };
+export type PedanaRow = { codice: string; destinazione: string; numeroColli: string; numeroPedane: string; mittente: string; merce: string };
 
 export type ImportResult = OrdineForm & { pedane: PedanaRow[] };
 

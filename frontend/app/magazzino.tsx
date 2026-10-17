@@ -143,16 +143,13 @@ export default function Magazzino() {
             Solo consultazione: inserisci il tuo nome per segnare gli scarichi
           </Text>
         )}
-        <Text style={styles.hint}>
-          Posizione pedana <Text style={styles.bold}>(scarico)</Text> o numero ordine <Text style={styles.bold}>(carico)</Text>
-        </Text>
         <View style={styles.inputWrap}>
           <MaterialDesignIcons name="magnify" size={28} color={colors.brandSecondary} />
           <TextInput
             testID="magazzino-search-input"
             value={q}
             onChangeText={setQ}
-            placeholder="es. 019320 o 25023467"
+            placeholder="Posizione o N° ordine"
             placeholderTextColor={colors.muted}
             autoFocus
             autoCorrect={false}
@@ -167,54 +164,53 @@ export default function Magazzino() {
           )}
         </View>
       </View>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.chipRow}
-        contentContainerStyle={styles.chipRowContent}
-        keyboardShouldPersistTaps="handled"
-      >
-        {DATE_FILTRI.map((f) => {
-          const active = dataFiltro === f.key;
-          const n = f.key === "tutte" ? results.length : results.filter((p) => p.dataConsegna === isoDay(f.key === "oggi" ? 0 : 1)).length;
-          return (
-            <Pressable
-              key={f.key}
-              testID={`magazzino-date-filter-${f.key}`}
-              onPress={() => {
-                setDataFiltro(f.key);
-                setSelectedId(null);
-              }}
-              style={[styles.chip, { borderColor: active ? colors.brandSecondary : colors.borderStrong, backgroundColor: active ? colors.brandSecondary : colors.surfaceSecondary }]}
-            >
-              <MaterialDesignIcons name={f.icon as any} size={16} color={active ? colors.onBrandSecondary : colors.muted} />
-              <Text style={[styles.chipText, { color: active ? colors.onBrandSecondary : colors.onSurfaceSecondary }]}>{f.label}</Text>
-              <Text style={[styles.chipCount, { color: active ? colors.onBrandSecondary : colors.muted }]} testID={`magazzino-date-filter-count-${f.key}`}>{n}</Text>
-            </Pressable>
-          );
-        })}
-        <View style={styles.chipDivider} />
-        {FILTRI.map((f) => {
-          const active = filtro === f.key;
-          const n = f.key === "tutte" ? dateFiltered.length : dateFiltered.filter((p) => p.statoArrivo === f.key).length;
-          const tone = f.key === "tutte" ? colors.brandPrimary : statoColor(f.key, colors);
-          return (
-            <Pressable
-              key={f.key}
-              testID={`magazzino-filter-${f.key}`}
-              onPress={() => {
-                setFiltro(f.key);
-                setSelectedId(null);
-              }}
-              style={[styles.chip, { borderColor: active ? tone : colors.borderStrong, backgroundColor: active ? tone : colors.surfaceSecondary }]}
-            >
-              {f.key !== "tutte" && <View style={[styles.chipDot, { backgroundColor: active ? colors.onBrand : tone }]} />}
-              <Text style={[styles.chipText, { color: active ? colors.onBrand : colors.onSurfaceSecondary }]}>{f.label}</Text>
-              <Text style={[styles.chipCount, { color: active ? colors.onBrand : colors.muted }]} testID={`magazzino-filter-count-${f.key}`}>{n}</Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+      <View style={styles.chipWrap}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRowContent} keyboardShouldPersistTaps="handled">
+          {DATE_FILTRI.map((f) => {
+            const active = dataFiltro === f.key;
+            const n = f.key === "tutte" ? results.length : results.filter((p) => p.dataConsegna === isoDay(f.key === "oggi" ? 0 : 1)).length;
+            return (
+              <Pressable
+                key={f.key}
+                testID={`magazzino-date-filter-${f.key}`}
+                onPress={() => {
+                  setDataFiltro(f.key);
+                  setSelectedId(null);
+                }}
+                style={[styles.chip, { borderColor: active ? colors.brandSecondary : colors.borderStrong, backgroundColor: active ? colors.brandSecondary : colors.surfaceSecondary }]}
+              >
+                <MaterialDesignIcons name={f.icon as any} size={16} color={active ? colors.onBrandSecondary : colors.muted} />
+                <Text style={[styles.chipText, { color: active ? colors.onBrandSecondary : colors.onSurfaceSecondary }]}>{f.label}</Text>
+                <Text style={[styles.chipCount, { color: active ? colors.onBrandSecondary : colors.muted }]} testID={`magazzino-date-filter-count-${f.key}`}>{n}</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </View>
+      <View style={[styles.chipWrap, styles.chipWrapLast]}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRowContent} keyboardShouldPersistTaps="handled">
+          {FILTRI.map((f) => {
+            const active = filtro === f.key;
+            const n = f.key === "tutte" ? dateFiltered.length : dateFiltered.filter((p) => p.statoArrivo === f.key).length;
+            const tone = f.key === "tutte" ? colors.brandPrimary : statoColor(f.key, colors);
+            return (
+              <Pressable
+                key={f.key}
+                testID={`magazzino-filter-${f.key}`}
+                onPress={() => {
+                  setFiltro(f.key);
+                  setSelectedId(null);
+                }}
+                style={[styles.chip, { borderColor: active ? tone : colors.borderStrong, backgroundColor: active ? tone : colors.surfaceSecondary }]}
+              >
+                {f.key !== "tutte" && <View style={[styles.chipDot, { backgroundColor: active ? colors.onBrand : tone }]} />}
+                <Text style={[styles.chipText, { color: active ? colors.onBrand : colors.onSurfaceSecondary }]}>{f.label}</Text>
+                <Text style={[styles.chipCount, { color: active ? colors.onBrand : colors.muted }]} testID={`magazzino-filter-count-${f.key}`}>{n}</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </View>
 
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
@@ -280,70 +276,57 @@ export default function Magazzino() {
               const all = results.filter((p) => (p.numeroOrdine || "—") === g.numero);
               const done = all.filter((p) => p.statoArrivo === "completo").length;
               const colli = g.items.reduce((n, p) => n + (parseInt(p.numeroColli, 10) || 0), 0);
+              const pal = g.items.reduce((n, p) => n + (parseInt(p.numeroPedane ?? "", 10) || 0), 0);
+              const complete = done === all.length;
               return (
-                <Animated.View key={g.numero} entering={FadeInDown.delay(Math.min(gi, 6) * 50).duration(220)} style={styles.group} testID={`magazzino-group-${g.numero}`}>
+                <Animated.View key={g.numero} entering={FadeInDown.delay(Math.min(gi, 6) * 40).duration(200)} style={styles.group} testID={`magazzino-group-${g.numero}`}>
                   <View style={styles.groupHead}>
-                    <MaterialDesignIcons name="truck-outline" size={26} color={colors.onBrandPrimary} />
                     <View style={styles.flex}>
-                      <Text style={styles.groupLabel}>ORDINE</Text>
-                      <Text style={styles.groupNum} testID={`magazzino-group-numero-${g.numero}`}>{g.numero}</Text>
+                      <Text style={styles.groupNum} testID={`magazzino-group-numero-${g.numero}`}>Ord. {g.numero}</Text>
+                      <Text style={styles.groupMeta} numberOfLines={1} testID={`magazzino-group-summary-${g.numero}`}>
+                        {formatDate(g.items[0].dataConsegna)} · {g.items.length} posizion{g.items.length === 1 ? "e" : "i"}{pal ? ` · ${pal} pedane` : ""}{colli ? ` · ${colli} colli` : ""}
+                      </Text>
                     </View>
-                    <View style={styles.groupRight}>
-                      <Text style={styles.groupDate}>{formatDate(g.items[0].dataConsegna)}</Text>
-                      <Text style={styles.groupMeta} testID={`magazzino-group-summary-${g.numero}`}>
-                        {g.items.length} pedan{g.items.length === 1 ? "a" : "e"}{colli ? ` · ${colli} colli` : ""}
+                    <View style={[styles.countPill, complete && styles.countPillDone]} testID={complete ? `magazzino-ordine-completo-${g.numero}` : undefined}>
+                      {complete && <MaterialDesignIcons name="check" size={16} color={colors.onSuccess} />}
+                      <Text style={[styles.countPillText, complete && { color: colors.onSuccess }]} testID={`magazzino-group-progress-${g.numero}`}>
+                        {done}/{all.length}
                       </Text>
                     </View>
                   </View>
-                  <View style={styles.progressRow}>
-                    <View style={styles.progressTrack}>
-                      <View style={[styles.progressFill, { width: `${(done / all.length) * 100}%` }]} />
-                    </View>
-                    <Text style={styles.progressText} testID={`magazzino-group-progress-${g.numero}`}>Scaricate {done}/{all.length}</Text>
-                  </View>
-                  {done < all.length ? (
-                    <Pressable
-                      testID={`magazzino-scarica-ordine-button-${g.numero}`}
-                      onPress={() => {
-                        const req = { numero: g.numero, mancanti: all.length - done };
-                        if (operatore) setScaricaOrdine(req);
-                        else {
-                          pendingScarica.current = req;
-                          apriNome();
-                        }
-                      }}
-                      style={({ pressed }) => [styles.scaricaBtn, pressed && { opacity: 0.85 }]}
-                    >
-                      <MaterialDesignIcons name="check-all" size={22} color={colors.onSuccess} />
-                      <Text style={styles.scaricaText}>Scarica ordine intero ({all.length - done})</Text>
-                    </Pressable>
-                  ) : (
-                    <View style={styles.scaricatoBox} testID={`magazzino-ordine-completo-${g.numero}`}>
-                      <MaterialDesignIcons name="check-circle" size={20} color={colors.success} />
-                      <Text style={styles.scaricatoText}>Ordine scaricato</Text>
-                    </View>
-                  )}
-                  <View style={styles.groupItems}>
-                    {g.items.map((p) => (
+                  {g.items.map((p) => {
+                    const sc = statoColor(p.statoArrivo, colors);
+                    return (
                       <Pressable
                         key={p.id}
                         testID={`magazzino-result-${p.id}`}
                         onPress={() => setSelectedId(p.id)}
-                        style={({ pressed }) => [styles.resCard, { borderLeftColor: statoColor(p.statoArrivo, colors) }, pressed && { opacity: 0.8 }]}
+                        style={({ pressed }) => [styles.item, pressed && { backgroundColor: colors.surfaceTertiary }]}
                       >
+                        <View style={[styles.itemBar, { backgroundColor: sc }]} />
                         <View style={styles.flex}>
-                          <Text style={styles.resCode}>{p.codice}</Text>
-                          <Text style={styles.resDest} numberOfLines={1}>{p.destinazione}</Text>
-                          {!!p.merce && <Text style={styles.resMerce} numberOfLines={1}>{p.merce}</Text>}
+                          <View style={styles.itemTop}>
+                            <Text style={styles.resCode}>{p.codice}</Text>
+                            <Text style={[styles.itemStato, { color: sc }]}>{STATO_LABEL[p.statoArrivo]}</Text>
+                          </View>
+                          <Text style={styles.resMerce} numberOfLines={1}>{[p.merce, p.destinazione].filter(Boolean).join(" · ")}</Text>
                           <Text style={styles.resMeta} numberOfLines={1}>
-                            {p.mittente}
-                            {p.numeroColli ? ` · ${p.numeroColli} colli` : ""}
+                            {[p.mittente, p.numeroPedane ? `${p.numeroPedane} ped.` : "", p.numeroColli ? `${p.numeroColli} colli` : ""].filter(Boolean).join(" · ")}
                           </Text>
                         </View>
-                        <MaterialDesignIcons name="chevron-right" size={30} color={colors.muted} />
                       </Pressable>
-                    ))}
-                  </View>
+                    );
+                  })}
+                  {!!operatore && !complete && (
+                    <Pressable
+                      testID={`magazzino-scarica-ordine-button-${g.numero}`}
+                      onPress={() => setScaricaOrdine({ numero: g.numero, mancanti: all.length - done })}
+                      style={({ pressed }) => [styles.scaricaBtn, pressed && { opacity: 0.85 }]}
+                    >
+                      <MaterialDesignIcons name="check-all" size={20} color={colors.onSuccessTint} />
+                      <Text style={styles.scaricaText}>Scarica ordine intero ({all.length - done})</Text>
+                    </Pressable>
+                  )}
                 </Animated.View>
               );
             })}
@@ -405,7 +388,7 @@ export default function Magazzino() {
 
 type DataFiltro = "tutte" | "oggi" | "domani";
 const DATE_FILTRI: { key: DataFiltro; label: string; icon: string }[] = [
-  { key: "tutte", label: "Tutte le date", icon: "calendar-blank-outline" },
+  { key: "tutte", label: "Tutte", icon: "calendar-blank-outline" },
   { key: "oggi", label: "Oggi", icon: "calendar-today" },
   { key: "domani", label: "Domani", icon: "calendar-arrow-right" },
 ];
@@ -431,11 +414,23 @@ function groupByOrder(list: Pedana[]) {
     if (!map.has(k)) map.set(k, []);
     map.get(k)!.push(p);
   }
-  return [...map.entries()].map(([numero, items]) => ({ numero, items }));
+  return [...map.entries()]
+    .sort(([a], [b]) => a.localeCompare(b, "it", { numeric: true }))
+    .map(([numero, items]) => ({ numero, items: [...items].sort((x, y) => x.codice.localeCompare(y.codice, "it", { numeric: true })) }));
 }
 
+const STATO_LABEL = { attesa: "In attesa", parziale: "Parziale", completo: "Scaricato" } as const;
+
 const useStyles = makeStyles((c) => ({
-  chipRow: { flexGrow: 0, height: 56, backgroundColor: c.surfaceSecondary, borderBottomWidth: 1, borderBottomColor: c.border },
+  chipWrap: { height: 52, flexShrink: 0, justifyContent: "center", backgroundColor: c.surfaceSecondary },
+  chipWrapLast: { borderBottomWidth: 1, borderBottomColor: c.border },
+  countPill: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 12, height: 32, borderRadius: 999, backgroundColor: c.surfaceSecondary },
+  countPillDone: { backgroundColor: c.success },
+  countPillText: { fontFamily: fonts.textBold, fontSize: 15, color: c.onBrandTertiary },
+  item: { flexDirection: "row", gap: 12, paddingVertical: 10, paddingRight: 14, borderTopWidth: 1, borderTopColor: c.divider, minHeight: 64 },
+  itemBar: { width: 5, borderRadius: 3, marginLeft: 10 },
+  itemTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  itemStato: { fontFamily: fonts.textBold, fontSize: 13 },
   chipRowContent: { gap: 8, paddingHorizontal: 16, alignItems: "center" },
   chip: { height: 36, flexShrink: 0, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1.5 },
   titleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 },
@@ -444,8 +439,8 @@ const useStyles = makeStyles((c) => ({
   opText: { fontFamily: fonts.textBold, fontSize: 14, color: c.onBrandTertiary, flexShrink: 1 },
   readonlyHint: { fontFamily: fonts.textSemi, fontSize: 12, color: c.onWarningTint, marginBottom: 4 },
   chipDivider: { width: 1, height: 28, backgroundColor: c.borderStrong, marginHorizontal: 4 },
-  scaricaBtn: { minHeight: 52, marginHorizontal: 10, marginTop: 10, borderRadius: 12, backgroundColor: c.success, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
-  scaricaText: { fontFamily: fonts.textBold, fontSize: 15, color: c.onSuccess },
+  scaricaBtn: { minHeight: 48, margin: 10, borderRadius: 10, borderWidth: 1.5, borderColor: c.success, backgroundColor: c.successTint, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
+  scaricaText: { fontFamily: fonts.textBold, fontSize: 14, color: c.onSuccessTint },
   scaricatoBox: { flexDirection: "row", alignItems: "center", gap: 6, marginHorizontal: 10, marginTop: 10, padding: 10, borderRadius: 10, backgroundColor: c.successTint },
   scaricatoText: { fontFamily: fonts.textBold, fontSize: 14, color: c.onSuccessTint },
   sheetHead: { alignItems: "center", gap: 6, marginBottom: 16 },
@@ -456,12 +451,12 @@ const useStyles = makeStyles((c) => ({
   chipText: { fontFamily: fonts.textSemi, fontSize: 14 },
   chipCount: { fontFamily: fonts.textBold, fontSize: 13 },
   group: { backgroundColor: c.surfaceSecondary, borderRadius: 14, borderWidth: 1, borderColor: c.border, overflow: "hidden", marginBottom: 6 },
-  groupHead: { backgroundColor: c.brandPrimary, flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14, paddingVertical: 10 },
+  groupHead: { backgroundColor: c.brandTertiary, flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14, paddingVertical: 10 },
   groupLabel: { fontFamily: fonts.textBold, fontSize: 10, letterSpacing: 1.2, color: c.brandSoftText },
-  groupNum: { fontFamily: fonts.displayHeavy, fontSize: 26, color: c.onBrandPrimary },
+  groupNum: { fontFamily: fonts.displayHeavy, fontSize: 24, color: c.brandPrimary },
   groupRight: { alignItems: "flex-end" },
   groupDate: { fontFamily: fonts.textBold, fontSize: 14, color: c.onBrandPrimary },
-  groupMeta: { fontFamily: fonts.textMedium, fontSize: 12, color: c.brandSoftText },
+  groupMeta: { fontFamily: fonts.textMedium, fontSize: 12, color: c.onSurfaceTertiary },
   progressRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: c.brandTertiary },
   progressTrack: { flex: 1, height: 8, borderRadius: 4, backgroundColor: c.border, overflow: "hidden" },
   progressFill: { height: 8, borderRadius: 4, backgroundColor: c.success },
@@ -484,7 +479,7 @@ const useStyles = makeStyles((c) => ({
     minHeight: 68,
     backgroundColor: c.surfaceSecondary,
   },
-  input: { flex: 1, fontFamily: fonts.display, fontSize: 30, color: c.onSurface, paddingVertical: 8 },
+  input: { flex: 1, fontFamily: fonts.display, fontSize: 30, color: c.onSurface, paddingVertical: 8, ...({ outlineWidth: 0 } as object) },
   clear: { padding: 4 },
   content: { padding: 16 },
   loader: { marginTop: 48 },
@@ -504,7 +499,7 @@ const useStyles = makeStyles((c) => ({
     borderWidth: 1,
     borderColor: c.border,
   },
-  resCode: { fontFamily: fonts.display, fontSize: 26, color: c.onSuccessTint },
+  resCode: { fontFamily: fonts.display, fontSize: 22, color: c.onSurface },
   resDest: { fontFamily: fonts.textBold, fontSize: 16, color: c.onSurface },
   resMerce: { fontFamily: fonts.textSemi, fontSize: 14, color: c.onBrandTertiary },
   resMeta: { fontFamily: fonts.text, fontSize: 13, color: c.muted },

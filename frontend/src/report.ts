@@ -35,13 +35,13 @@ function buildHtml(dataIso: string, list: Pedana[], cooperativa: string) {
           const who = p.statoArrivo === "completo" ? p.arrivoCompletoDa : p.statoArrivo === "parziale" ? p.arrivoParzialeDa : "";
           return `<tr class="${p.statoArrivo}">
             <td><b>${esc(p.codice)}</b></td><td>${esc(p.mittente)}</td><td>${esc(p.merce)}</td>
-            <td class="num">${esc(p.numeroColli)}</td><td>${esc(p.destinazione)}</td>
+            <td class="num">${esc(p.numeroPedane)}</td><td class="num">${esc(p.numeroColli)}</td><td>${esc(p.destinazione)}</td>
             <td><span class="pill ${p.statoArrivo}">${STATO[p.statoArrivo]}</span></td>
             <td>${esc(ora(when))}</td><td>${esc(who)}</td><td>${esc(p.noteParziale)}</td></tr>`;
         })
         .join("");
       return `<h2>Ordine ${esc(g.numero)} <small>${esc(g.items[0].agenzia)} · scaricate ${d}/${g.items.length}</small></h2>
-        <table><thead><tr><th>Posizione</th><th>Mittente</th><th>Merce</th><th>Colli</th><th>Destinazione</th><th>Stato</th><th>Ora</th><th>Operatore</th><th>Note</th></tr></thead><tbody>${body}</tbody></table>`;
+        <table><thead><tr><th>Posizione</th><th>Mittente</th><th>Merce</th><th>Pedane</th><th>Colli</th><th>Destinazione</th><th>Stato</th><th>Ora</th><th>Operatore</th><th>Note</th></tr></thead><tbody>${body}</tbody></table>`;
     })
     .join("");
   return `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Report scarichi ${esc(formatDate(dataIso))}</title>

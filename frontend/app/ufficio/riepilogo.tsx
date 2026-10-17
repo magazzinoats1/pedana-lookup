@@ -145,6 +145,7 @@ export default function Riepilogo() {
             groups.map((g, gi) => {
               const d = g.items.filter((p) => p.statoArrivo === "completo").length;
               const colli = g.items.reduce((n, p) => n + (parseInt(p.numeroColli, 10) || 0), 0);
+              const pal = g.items.reduce((n, p) => n + (parseInt(p.numeroPedane ?? "", 10) || 0), 0);
               const complete = d === g.items.length;
               return (
                 <Animated.View key={g.numero} entering={FadeInDown.delay(Math.min(gi, 6) * 40).duration(220)} style={styles.card} testID={`riepilogo-ordine-${g.numero}`}>
@@ -153,7 +154,7 @@ export default function Riepilogo() {
                     <View style={styles.flex}>
                       <Text style={styles.cardNum}>{g.numero}</Text>
                       <Text style={styles.cardMeta} numberOfLines={1}>
-                        {g.items[0].agenzia || "—"} · {g.items.length} pedane{colli ? ` · ${colli} colli` : ""}
+                        {g.items[0].agenzia || "—"} · {g.items.length} posizioni{pal ? ` · ${pal} pedane` : ""}{colli ? ` · ${colli} colli` : ""}
                       </Text>
                     </View>
                     <Text style={[styles.cardCount, { color: complete ? colors.success : colors.brandPrimary }]} testID={`riepilogo-ordine-progress-${g.numero}`}>
@@ -173,7 +174,7 @@ export default function Riepilogo() {
                         <View style={styles.flex}>
                           <Text style={styles.rowCode}>{p.codice}</Text>
                           <Text style={styles.rowMeta} numberOfLines={1}>
-                            {[p.mittente, p.merce, p.numeroColli ? `${p.numeroColli} colli` : ""].filter(Boolean).join(" · ")}
+                            {[p.mittente, p.merce, p.numeroPedane ? `${p.numeroPedane} ped.` : "", p.numeroColli ? `${p.numeroColli} colli` : ""].filter(Boolean).join(" · ")}
                           </Text>
                         </View>
                         <View style={styles.rowRight}>

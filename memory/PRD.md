@@ -25,9 +25,12 @@ User uploaded a KÖLLA transport-order PDF and a reference web app (GestioneLogi
 - Nome magazziniere: list viewable by anyone; marking stato / scarica ordine only after entering worker name (saved on device); name recorded (arrivoCompletoDa / arrivoParzialeDa) and shown in Magazzino detail and Ufficio list
 - Riepilogo Ufficio (/ufficio/riepilogo): live board per day (auto-refresh 15s), stats camion/pedane/scaricate/parziali/attesa, per-order progress with time + operatore (GET /api/riepilogo)
 - Daily report: PDF via expo-print + share sheet (web: print dialog), per order table with stato, ora, operatore
+- numeroPedane per position (PDF 'Pedane' column) everywhere incl. report
+- Magazzino: fixed collapsed filter chips (two fixed rows: date / stato), simplified list, groups sorted by numero ordine asc
 - Security audit run: SEC-001 default office password (change it), SEC-002 wildcard CORS, hardening: login rate limit, PDF size cap
 
 ## Backlog
+- P1: Archive/pagination when pedane > 1000 (lists currently capped at 1000)
 - P1: Security fixes from audit (force password change on first login, login rate limit, PDF size limit, restrict CORS)
 - P1: Barcode/label scan for positions (camera)
 - P1: Daily arrivals overview / filters by stato and date

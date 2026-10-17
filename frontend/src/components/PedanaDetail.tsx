@@ -57,6 +57,7 @@ export function PedanaDetail({
       <View style={styles.grid}>
         <InfoTile label="MITTENTE" value={pedana.mittente} icon="truck-delivery-outline" testID="pedana-detail-mittente" />
         <InfoTile label="DATA CONSEGNA" value={formatDate(pedana.dataConsegna)} icon="calendar" testID="pedana-detail-data" />
+        <InfoTile label="N° PEDANE" value={pedana.numeroPedane ?? ""} icon="layers-triple-outline" testID="pedana-detail-numero-pedane" />
         <InfoTile label="N° COLLI" value={pedana.numeroColli} icon="package-variant-closed" testID="pedana-detail-colli" />
         <InfoTile label="AGENZIA" value={pedana.agenzia} icon="domain" testID="pedana-detail-agenzia" />
       </View>

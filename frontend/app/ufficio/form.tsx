@@ -14,7 +14,7 @@ import { Button, Field, IconButton } from "@/src/components/ui";
 import { fonts, makeStyles, useTheme } from "@/src/theme";
 
 const emptyForm = { numeroOrdine: "", agenzia: "", note: "" };
-const emptyRow: PedanaRow = { codice: "", destinazione: "", numeroColli: "", mittente: "", merce: "" };
+const emptyRow: PedanaRow = { codice: "", destinazione: "", numeroColli: "", numeroPedane: "", mittente: "", merce: "" };
 
 type Errors = {
   numeroOrdine?: string;
@@ -68,7 +68,7 @@ export default function OrdineFormScreen() {
       .then((o) => {
         setForm({ numeroOrdine: o.numeroOrdine, agenzia: o.agenzia, note: o.note });
         setData(isoToIt(o.dataConsegna));
-        setRows([{ codice: o.codice, destinazione: o.destinazione, numeroColli: o.numeroColli, mittente: o.mittente, merce: o.merce || "" }]);
+        setRows([{ codice: o.codice, destinazione: o.destinazione, numeroColli: o.numeroColli, numeroPedane: o.numeroPedane || "", mittente: o.mittente, merce: o.merce || "" }]);
       })
       .catch((e) => toast(e.message, "error"))
       .finally(() => setLoading(false));
@@ -332,6 +332,9 @@ export default function OrdineFormScreen() {
                   </View>
                   <View style={styles.flex}>
                     <Field label="N° Colli" value={r.numeroColli} onChangeText={(t) => setRow(i, "numeroColli", t.replace(/[^0-9]/g, ""))} placeholder="es. 84" keyboardType="number-pad" testID={`form-pedana-colli-input-${i}`} />
+                  </View>
+                  <View style={styles.flex}>
+                    <Field label="N° Pedane" value={r.numeroPedane} onChangeText={(t) => setRow(i, "numeroPedane", t.replace(/[^0-9]/g, ""))} placeholder="es. 1" keyboardType="number-pad" testID={`form-pedana-numero-pedane-input-${i}`} />
                   </View>
                 </View>
                 <Field label="Tipo merce" value={r.merce} onChangeText={(t) => setRow(i, "merce", t)} placeholder="es. Uva rossa senza semi, Radicchio…" testID={`form-pedana-merce-input-${i}`} />

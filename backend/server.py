@@ -79,6 +79,7 @@ class Pedana(BaseDocument):
     codice: str
     destinazione: str
     numeroColli: str = ""
+    numeroPedane: str = ""
     merce: str = ""
     createdAt: str = Field(default_factory=now_iso)
     ultimaRettifica: Optional[str] = None
@@ -102,6 +103,7 @@ class PedanaIn(BaseModel):
     codice: str
     destinazione: str
     numeroColli: str = ""
+    numeroPedane: str = ""
     mittente: str = ""
     merce: str = ""
 
@@ -291,7 +293,7 @@ async def create_pedane(body: CreateReq, _=Depends(require_ufficio)):
             numeroOrdine=f.numeroOrdine.strip(), agenzia=f.agenzia.strip(),
             mittente=(p.mittente.strip() or f.mittente.strip()), dataConsegna=f.dataConsegna,
             note=f.note.strip(), codice=p.codice.strip(), destinazione=p.destinazione.strip(),
-            numeroColli=p.numeroColli.strip(), merce=p.merce.strip(),
+            numeroColli=p.numeroColli.strip(), numeroPedane=p.numeroPedane.strip(), merce=p.merce.strip(),
         )
         await db.pedane.insert_one(item.to_mongo())
         created.append(item)
@@ -305,7 +307,7 @@ async def update_pedana(pid: str, body: UpdateReq, _=Depends(require_ufficio)):
         "numeroOrdine": f.numeroOrdine.strip(), "agenzia": f.agenzia.strip(),
         "mittente": (p.mittente.strip() or f.mittente.strip()), "dataConsegna": f.dataConsegna,
         "note": f.note.strip(), "codice": p.codice.strip(), "destinazione": p.destinazione.strip(),
-        "numeroColli": p.numeroColli.strip(), "merce": p.merce.strip(), "ultimaRettifica": now_iso(),
+        "numeroColli": p.numeroColli.strip(), "numeroPedane": p.numeroPedane.strip(), "merce": p.merce.strip(), "ultimaRettifica": now_iso(),
     }
     res = await db.pedane.find_one_and_update({"id": pid}, {"$set": patch}, return_document=True)
     if not res:
@@ -357,7 +359,7 @@ Rispondi SOLO con JSON valido, senza testo extra, con questa struttura esatta:
   "dataConsegna": "data di scarico/consegna in formato YYYY-MM-DD",
   "note": "istruzioni importanti brevi (temperatura, avvisi), max 200 caratteri",
   "pedane": [
-    {"codice": "codice posizione CORTO stampato SOTTO il codice lungo, nel formato NNNN-NNNNNN (es. 2619-019320, 2619-019318, 2619-019321). NON usare il codice lungo sopra (es. 2619-019320-10000 o A2619-023221-10000)", "destinazione": "nome destinatario + città (luogo di scarico)", "numeroColli": "numero colli (valore K0/KO) come intero senza decimali", "mittente": "nome stampato A DESTRA della riga, in cima alla colonna tipologia merce (es. ORCHIDEA, BERTOLI FRUIT, MORANDO GRAZIANO). Scrivilo in maiuscole come nel documento, senza descrizione merce", "merce": "tipo di merce breve (es. Uva rossa senza semi, Uva bianca senza semi, Radicchio Trevisano, Radicchio Castelfranco)"}
+    {"codice": "codice posizione CORTO stampato SOTTO il codice lungo, nel formato NNNN-NNNNNN (es. 2619-019320, 2619-019318, 2619-019321). NON usare il codice lungo sopra (es. 2619-019320-10000 o A2619-023221-10000)", "destinazione": "nome destinatario + città (luogo di scarico)", "numeroColli": "numero colli (valore K0/KO) come intero senza decimali", "numeroPedane": "numero di pedane della colonna Pedane (es. 1,00 EUR = 1; 2,00 EUR = 2; 0,00 = 0), stampato sopra il codice posizione corto, come intero senza decimali", "mittente": "nome stampato A DESTRA della riga, in cima alla colonna tipologia merce (es. ORCHIDEA, BERTOLI FRUIT, MORANDO GRAZIANO). Scrivilo in maiuscole come nel documento, senza descrizione merce", "merce": "tipo di merce breve (es. Uva rossa senza semi, Uva bianca senza semi, Radicchio Trevisano, Radicchio Castelfranco)"}
   ]
 }
 Includi OGNI riga presente nella sezione Luogo di carico (non ripetere le righe della sezione Luogo di scarico). Se un dato manca usa stringa vuota."""
@@ -403,7 +405,8 @@ async def import_pdf(file: UploadFile = File(...), _=Depends(require_ufficio)):
         pedane.append({
             "codice": str(p.get("codice", "") or "").strip(),
             "destinazione": str(p.get("destinazione", "") or "").strip(),
-            "numeroColli": re.sub(r"[.,]0+$", "", str(p.get("numeroColli", "") or "").strip()),
+            "numeroColli": re.sub(r"[.,]0+$", "", str(p.get("numeroColli") if p.get("numeroColli") is not None else "").strip()),
+            "numeroPedane": re.sub(r"[.,]0+$", "", str(p.get("numeroPedane") if p.get("numeroPedane") is not None else "").replace("EUR", "").strip()),
             "mittente": str(p.get("mittente", "") or "").strip(),
             "merce": str(p.get("merce", "") or "").strip(),
         })
