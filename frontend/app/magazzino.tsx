@@ -24,7 +24,7 @@ export default function Magazzino() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [coop, setCoop] = useState("");
-  const [filtro, setFiltro] = useState<Filtro>("tutte");
+  const [filtro, setFiltro] = useState<Filtro>("attesa");
   const [dataFiltro, setDataFiltro] = useState<DataFiltro>("tutte");
   const [scaricaOrdine, setScaricaOrdine] = useState<{ numero: string; mancanti: number } | null>(null);
   const [scaricando, setScaricando] = useState(false);
@@ -117,6 +117,7 @@ export default function Magazzino() {
 
   useEffect(() => {
     setSelectedId(null);
+    setFiltro(q.trim() ? "tutte" : "attesa");
     const t = setTimeout(() => search(q), q ? 300 : 0);
     return () => clearTimeout(t);
   }, [q]);
@@ -298,6 +299,17 @@ export default function Magazzino() {
           </View>
         ) : (
           <View style={styles.gap}>
+            {filtro === "attesa" && !q.trim() && (
+              <View style={styles.daBanner} testID="magazzino-da-scaricare-banner">
+                <MaterialDesignIcons name="truck-alert-outline" size={28} color={colors.brandSecondary} />
+                <View style={styles.flex}>
+                  <Text style={styles.daTitle} testID="magazzino-da-scaricare-count">
+                    {filtered.length} pedan{filtered.length === 1 ? "a" : "e"} da scaricare
+                  </Text>
+                  <Text style={styles.daSub}>Non ancora arrivate in magazzino · {groupByOrder(filtered).length} ordini</Text>
+                </View>
+              </View>
+            )}
             <Text style={styles.count} testID="magazzino-results-count">
               {q.trim() ? `${filtered.length} pedane trovate` : filtro === "tutte" && dataFiltro === "tutte" ? `Tutta la merce registrata · ${filtered.length} pedane` : `${filtered.length} pedane`} · {groupByOrder(filtered).length} ordini
             </Text>
@@ -452,8 +464,8 @@ function isoDay(offset: number) {
 
 type Filtro = "tutte" | "attesa" | "parziale" | "completo";
 const FILTRI: { key: Filtro; label: string }[] = [
+  { key: "attesa", label: "Da scaricare" },
   { key: "tutte", label: "Tutte" },
-  { key: "attesa", label: "In attesa" },
   { key: "parziale", label: "Parziali" },
   { key: "completo", label: "Scaricate" },
 ];
@@ -489,6 +501,9 @@ const useStyles = makeStyles((c) => ({
   opPillWarn: { backgroundColor: c.warningTint, borderWidth: 1.5, borderColor: c.warning },
   opText: { fontFamily: fonts.textBold, fontSize: 14, color: c.onBrandTertiary, flexShrink: 1 },
   readonlyHint: { fontFamily: fonts.textSemi, fontSize: 12, color: c.onWarningTint, marginBottom: 4 },
+  daBanner: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: c.brandTertiary, borderRadius: 12, padding: 14, borderWidth: 1.5, borderColor: c.brandSecondary },
+  daTitle: { fontFamily: fonts.display, fontSize: 24, color: c.brandPrimary },
+  daSub: { fontFamily: fonts.textMedium, fontSize: 13, color: c.onSurfaceTertiary },
   chipDivider: { width: 1, height: 28, backgroundColor: c.borderStrong, marginHorizontal: 4 },
   scaricaBtn: { minHeight: 48, margin: 10, borderRadius: 10, borderWidth: 1.5, borderColor: c.success, backgroundColor: c.successTint, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
   scaricaText: { fontFamily: fonts.textBold, fontSize: 14, color: c.onSuccessTint },

@@ -1,0 +1,25 @@
+{
+  "summary": "Frontend-only verification of the new 'Da scaricare' default on /magazzino at 390x844. ALL CHECKS PASSED. Backend GET /api/pedane/tutte returned 37 pedane (37 attesa, 0 parziale, 0 completo, 19 distinct orders in attesa). On entering Magazzino with no search: status chips render in the required order [attesa→tutte→parziale→completo] (x positions 16/172/265/381) with labels 'Da scaricare / Tutte / Parziali / Scaricate'; attesa chip is visually active (bg rgb(37,99,235) vs white others). magazzino-da-scaricare-banner is visible with magazzino-da-scaricare-count '37 pedane da scaricare' matching backend attesa count and subtitle '… · 19 ordini' matching distinct numeroOrdine among attesa. magazzino-filter-count-{attesa|tutte|parziale|completo} = 37/37/0/0 matching backend. All visible result cards (20 sampled) show stato 'In attesa' — list correctly filtered. Date chips combine with Da scaricare: Oggi switches banner to '6 pedane da scaricare' (matches 6 attesa with dataConsegna=today); Domani → magazzino-filter-empty (0 attesa tomorrow). Typing a code (e.g. '2619-019234-10000') hides the banner and auto-switches the active chip to Tutte (tutte bg becomes rgb(26,58,107), attesa reverts to white). Tapping magazzino-search-clear-button restores the default: banner reappears and attesa chip bg is rgb(37,99,235) again. Parziale and Completo chips (0 items) show magazzino-filter-empty; magazzino-filter-reset-button sets filtro=tutte & dataFiltro=tutte (banner stays hidden, tutte chip active). document.documentElement.scrollWidth == window.innerWidth (390==390) — no horizontal overflow at 390x844.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "magazzino.tsx:120 setFiltro(q.trim() ? 'tutte' : 'attesa') correctly toggles between search mode (Tutte) and default (Da scaricare) inside the q-watching useEffect — behavior verified end-to-end.",
+    "magazzino.tsx:302 banner is correctly gated on filtro==='attesa' && !q.trim() so it hides on other chips and during search; subtitle uses groupByOrder(filtered).length giving distinct numeroOrdine count — verified 19 ordini.",
+    "magazzino.tsx:466 FILTRI array order [attesa, tutte, parziale, completo] matches request; label 'Da scaricare' as specified.",
+    "magazzino.tsx:313 results-count uses groupByOrder(filtered).length so banner subtitle and header stay consistent."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (frontend-only testing requested)", "frontend": "100% (10/10 UI checks passed)"},
+  "seed_data_creation": "None. Real DB had only attesa pedane (37) so completo-search flow was exercised using an attesa codice; the key assertion (filter auto-switches to Tutte on typing, clearing restores Da scaricare) was verified via chip background colors and banner visibility. No TEST order/worker was created and no data was mutated.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Public URL EXPO_PUBLIC_BACKEND_URL=https://pedana-lookup.preview.emergentagent.com. /api/pedane/tutte must be fetched inside the browser context (page.evaluate(fetch)) — direct urllib from the test runner returns 403 (ingress likely checks Origin/Referer). Default state: tap accesso-magazzino-button → magazzino-filter-attesa active, magazzino-da-scaricare-banner visible with count N (attesa) and 'M ordini' = distinct numeroOrdine among attesa pedane. Typing anything in magazzino-search-input auto-selects magazzino-filter-tutte (active bg rgb(26,58,107)); clearing restores attesa (active bg rgb(37,99,235)). Chip order in DOM: attesa→tutte→parziale→completo. All tests at viewport 390x844.",
+  "rca_of_issue": "N/A — this iteration verified a new feature; no bug encountered."
+}
