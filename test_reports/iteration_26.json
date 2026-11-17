@@ -1,0 +1,32 @@
+{
+  "summary": "Tested office website GET /api/sito at 1280x800 end-to-end with the backend running live. Everything requested works: wrong password shows 'Password errata', the correct password opens the app, and PDF upload via #file fills the form with numero 25024298, consegna 2026-11-19, 9 rows, trasportatore Antolini s.r.l. and agenzia KÖLLA. An empty numero shows the validation error. Saving TEST_SITO_1 shows 'registrato (9 pedane)'. Saving the same order again opens the 'Ordine già esistente!' confirm; accepting shows 'sovrascritto (9 pedane)', and /pedane/duplicati confirms exactly 9 pedane, so the overwrite does not duplicate. On the Arrivi tab the date defaults to today (server date 2026-11-17), orders are grouped with badges, and changing the date to 2026-11-18 and back reloads the list. 'Aggiornato alle' is shown, and the 15s auto-refresh works: after a TEST magazziniere marked a pedana 'completo' through the API, the page showed 'Scaricata' and 'TEST_SitoWorker' without a reload, and the summary went from 0 to 1 scaricate. Esci clears the session token and shows the login again, and a reload stays logged out. Found 1 minor UI bug.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Message banner #msg (sito.html)", "issue": "The red 'Password errata' banner stays visible after the next successful login, because enter() never clears #msg and error messages never auto-hide. The same stale banner would stay after a temporary auto-refresh error, even once refreshes succeed again. Reference: /app/backend/sito.html:116-120,154-159,249", "testID": "#msg", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Arrivi", "issues": ["The summary badge 'N da scaricare' is computed as tot - completo, so pedane in 'parziale' are counted as 'da scaricare' and there is no separate parziale count (sito.html:238-240)."]},
+      {"screen": "Nuovo ordine", "issues": ["Rows with an empty Posizione are dropped silently on save (filter p => p.codice), with no warning (sito.html:210).", "The drop zone is still clickable while a PDF is being read, so a second upload can start in parallel."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/sito_helper.py", "/app/backend/tests/sito_worker_helper.py"],
+  "action_items": [
+    "sito.html: clear #msg (className='msg') in enter() and at the start of each successful caricaArrivi()/importa()/salva().",
+    "Optional: add a 'parziali' badge in the Arrivi summary; warn when a row has data but no Posizione; disable the drop zone while a PDF is being read."
+  ],
+  "critical_code_review_comments": [
+    "Output is escaped with esc() everywhere in the HTML; no XSS found.",
+    "The overwrite inserts the new pedane first and then deletes the old ones by id $nin, which is safe. The confirm dialog warns when pedane were already unloaded.",
+    "/api/sito is public, but every data call requires the ufficio bearer token, and a 401 logs the user out. OK."
+  ],
+  "updated_files": ["/app/backend/tests/sito_helper.py (new)", "/app/backend/tests/sito_worker_helper.py (new)"],
+  "success_rate": {"backend": "100%", "frontend": "100% of requested flows (1 minor UI bug)"},
+  "seed_data_creation": "Created the TEST_SITO_1 order (9 pedane) and the TEST_SitoWorker magazziniere. Both were deleted by id afterwards. Real order 25024298 had 0 pedane before and after.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Server date is 2026-11-17. Use sito_helper.py count|delete <numero> (delete only allowed for TEST_ numbers) and sito_worker_helper.py create|delete <id>, with EXPO_PUBLIC_BACKEND_URL exported. The test PDF parses to order 25024298 with 9 rows.",
+  "rca_of_issue": "Stale banner: show() only auto-hides success messages (ok=true), and enter()/logout() never reset #msg."
+}

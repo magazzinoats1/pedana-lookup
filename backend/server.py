@@ -1,4 +1,5 @@
 from fastapi import FastAPI, APIRouter, Depends, Header, HTTPException, UploadFile, File, Query
+from fastapi.responses import HTMLResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -844,6 +845,15 @@ async def scan_etichetta(file: UploadFile = File(...)):
 @api.get("/")
 async def root():
     return {"message": "Gestione Logistica API"}
+
+
+SITO_HTML = (ROOT_DIR / "sito.html")
+
+
+@api.get("/sito", response_class=HTMLResponse, include_in_schema=False)
+async def sito():
+    # Browser site for the office: register orders from PDF + live arrivals (same data as the app)
+    return HTMLResponse(SITO_HTML.read_text(encoding="utf-8"))
 
 
 app.include_router(api)

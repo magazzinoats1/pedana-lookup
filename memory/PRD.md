@@ -49,3 +49,7 @@ User uploaded a KÖLLA transport-order PDF and a reference web app (GestioneLogi
 ## Update: PDF parsing deterministico
 - /api/import-pdf ora usa prima un parser a regole fisse (PyMuPDF) per il formato KÖLLA: dataConsegna SOLO da "Luogo di scarico", destinazione = destinatario scarico (nome - città), mittente = fornitore in maiuscolo, dataArrivo = data di carico + 1. Risultato identico ogni volta e istantaneo.
 - Se il layout non è riconosciuto, fallback su Gemini con prompt rafforzato.
+
+## Update: Sito Ufficio (browser)
+- GET /api/sito serves /app/backend/sito.html: office login, PDF drag&drop import, editable rows, save with overwrite confirm, "Arrivi in magazzino" tab auto-refresh 15s (stato + magazziniere). Production URL: https://pedana-lookup.emergent.host/api/sito
+- Expo SDK upgraded to 58 (RN 0.88).
