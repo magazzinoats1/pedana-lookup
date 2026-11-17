@@ -251,7 +251,7 @@ async def nomi_magazzinieri():
 
 @api.get("/magazzinieri")
 async def list_magazzinieri(_=Depends(require_ufficio)):
-    docs = await db.magazzinieri.find({}).sort("nome", 1).to_list(500)
+    docs = await db.magazzinieri.find({}).sort([("createdAt", -1), ("_id", -1)]).to_list(500)
     return [worker_out(d) for d in docs]
 
 
@@ -599,7 +599,7 @@ RX_DATE = re.compile(r"^(\d{2})\.(\d{2})\.(\d{4})$")
 RX_TIME = re.compile(r"^\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2}$")
 RX_LONG = re.compile(r"^A?\d{4}-\d{6}-\d+$")
 RX_SHORT = re.compile(r"^\d{4}-\d{6}$")
-MERCE_SKIP = re.compile(r"\d|rinfusa|^cl\.|collo|cartone|epal|polistirolo|lux|extra", re.I)
+MERCE_SKIP = re.compile(r"\d|rinfusa|^cl\.|collo|cartone|epal|polistirolo|lux|extra|cestino|plastica|flowpack", re.I)
 
 
 def iso(d: str) -> str:
@@ -612,7 +612,7 @@ def num(s: str) -> str:
 
 
 def merce_breve(desc: str) -> str:
-    parts = [p.strip() for p in desc.split(",")]
+    parts = [re.sub(r"\s+IT$", "", p.strip()) for p in desc.split(",")]
     if "IT" not in parts:
         return parts[0] if parts else ""
     i = parts.index("IT")
