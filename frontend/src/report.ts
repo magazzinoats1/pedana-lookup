@@ -34,14 +34,14 @@ function buildHtml(dataIso: string, list: Pedana[], cooperativa: string) {
           const when = p.statoArrivo === "completo" ? p.arrivoCompletoAt : p.statoArrivo === "parziale" ? p.arrivoParzialeAt : null;
           const who = p.statoArrivo === "completo" ? p.arrivoCompletoDa : p.statoArrivo === "parziale" ? p.arrivoParzialeDa : "";
           return `<tr class="${p.statoArrivo}">
-            <td><b>${esc(p.codice)}</b></td><td>${esc(p.mittente)}</td><td>${esc(p.merce)}</td>
+            <td><b>${esc(p.codice)}</b></td><td>${esc(formatDate(p.dataArrivo || p.dataConsegna))} ${esc(p.oraArrivo)}</td><td>${esc(p.mittente)}</td><td>${esc(p.merce)}</td>
             <td class="num">${esc(p.numeroPedane)}</td><td class="num">${esc(p.numeroColli)}</td><td>${esc(p.destinazione)}</td>
             <td><span class="pill ${p.statoArrivo}">${STATO[p.statoArrivo]}</span></td>
             <td>${esc(ora(when))}</td><td>${esc(who)}</td><td>${esc(p.noteParziale)}</td></tr>`;
         })
         .join("");
       return `<h2>Ordine ${esc(g.numero)} <small>${esc(g.items[0].agenzia)}${isTrasbordo(g.items[0].trasportatore) ? ` · <b style="color:#D97706">TRASBORDO ${esc(g.items[0].trasportatore)}</b>` : ""} · scaricate ${d}/${g.items.length}</small></h2>
-        <table><thead><tr><th>Posizione</th><th>Mittente</th><th>Merce</th><th>Pedane</th><th>Colli</th><th>Destinazione</th><th>Stato</th><th>Ora</th><th>Operatore</th><th>Note</th></tr></thead><tbody>${body}</tbody></table>`;
+        <table><thead><tr><th>Posizione</th><th>Arrivo</th><th>Mittente</th><th>Merce</th><th>Pedane</th><th>Colli</th><th>Destinazione</th><th>Stato</th><th>Ora</th><th>Operatore</th><th>Note</th></tr></thead><tbody>${body}</tbody></table>`;
     })
     .join("");
   return `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Report scarichi ${esc(formatDate(dataIso))}</title>
@@ -57,7 +57,7 @@ function buildHtml(dataIso: string, list: Pedana[], cooperativa: string) {
     .pill.parziale{background:#FFFBEB;color:#92400E} .pill.attesa{background:#EFF6FF;color:#1D4ED8}
     .foot{margin-top:20px;color:#64748B}
   </style></head><body>
-  <h1>Report scarichi — ${esc(formatDate(dataIso))}</h1>
+  <h1>Report scarichi — arrivi del ${esc(formatDate(dataIso))}</h1>
   <div class="sub">Antolini Trasporti e Spedizioni${cooperativa ? ` · Cooperativa ${esc(cooperativa)}` : ""}</div>
   <div class="stats">
     <div class="stat"><b>${groups.length}</b>Camion/ordini</div><div class="stat"><b>${list.length}</b>Pedane</div>

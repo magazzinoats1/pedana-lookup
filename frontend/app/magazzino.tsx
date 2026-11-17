@@ -1,12 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, AppState, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { MaterialDesignIcons } from "@react-native-vector-icons/material-design-icons";
 
-import { api, formatDate, isTrasbordo, MAG_TOKEN_KEY, Pedana } from "@/src/api";
+import { api, dataArrivoEff, formatDate, isTrasbordo, MAG_TOKEN_KEY, Pedana } from "@/src/api";
 import { storage } from "@/src/utils/storage";
 import { AppHeader } from "@/src/components/AppHeader";
 import { PedanaDetail, statoColor } from "@/src/components/PedanaDetail";
@@ -99,16 +99,20 @@ export default function Magazzino() {
     api<{ cooperativa: string }>("/settings").then((s) => setCoop(s.cooperativa)).catch(() => {});
   }, []);
 
-  async function search(text: string) {
+  async function search(text: string, silent = false) {
     const id = ++reqId.current;
-    setLoading(true);
-    setError("");
+    if (!silent) {
+      setLoading(true);
+      setError("");
+    }
     try {
       const r = await api<Pedana[]>(text.trim() ? `/pedane/cerca?q=${encodeURIComponent(text.trim())}` : "/pedane/tutte");
       if (id !== reqId.current) return;
       setResults(r);
+      setError("");
     } catch (e: any) {
-      if (id === reqId.current) setError(e.message);
+      // Background refresh failures keep the current list on screen
+      if (id === reqId.current && !silent) setError(e.message);
     } finally {
       if (id === reqId.current) {
         setLoading(false);
@@ -121,10 +125,17 @@ export default function Magazzino() {
     setSelectedId(null);
     setFiltro(q.trim() ? "tutte" : "attesa");
     const t = setTimeout(() => search(q), q ? 300 : 0);
-    return () => clearTimeout(t);
+    // Live: refresh the list every 20s so new orders from the office appear by themselves
+    const live = setInterval(() => {
+      if (AppState.currentState === "active") search(q, true);
+    }, 20000);
+    return () => {
+      clearTimeout(t);
+      clearInterval(live);
+    };
   }, [q]);
 
-  const dateFiltered = dataFiltro === "tutte" ? results : results.filter((p) => p.dataConsegna === isoDay(dataFiltro === "oggi" ? 0 : 1));
+  const dateFiltered = dataFiltro === "tutte" ? results : results.filter((p) => dataArrivoEff(p) === isoDay(dataFiltro === "oggi" ? 0 : 1));
   const filtered = filtro === "tutte" ? dateFiltered : dateFiltered.filter((p) => p.statoArrivo === filtro);
 
   async function confermaScarica() {
@@ -201,7 +212,7 @@ export default function Magazzino() {
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRowContent} keyboardShouldPersistTaps="handled">
           {DATE_FILTRI.map((f) => {
             const active = dataFiltro === f.key;
-            const n = f.key === "tutte" ? results.length : results.filter((p) => p.dataConsegna === isoDay(f.key === "oggi" ? 0 : 1)).length;
+            const n = f.key === "tutte" ? results.length : results.filter((p) => dataArrivoEff(p) === isoDay(f.key === "oggi" ? 0 : 1)).length;
             return (
               <Pressable
                 key={f.key}
@@ -349,7 +360,7 @@ export default function Magazzino() {
                         </View>
                       )}
                       <Text style={styles.groupMeta} numberOfLines={1} testID={`magazzino-group-summary-${g.numero}`}>
-                        {formatDate(g.items[0].dataConsegna)} · {mergePositions(g.items).length} posizion{mergePositions(g.items).length === 1 ? "e" : "i"}{pal ? ` · ${pal} pedane` : ""}{colli ? ` · ${colli} colli` : ""}
+                        Arrivo {[...new Set(g.items.map((p) => dataArrivoEff(p)))].sort().map((d) => formatDate(d).slice(0, 5)).join(", ")} · {mergePositions(g.items).length} posizion{mergePositions(g.items).length === 1 ? "e" : "i"}{pal ? ` · ${pal} pedane` : ""}{colli ? ` · ${colli} colli` : ""}
                       </Text>
                     </View>
                     <View style={[styles.countPill, complete && styles.countPillDone]} testID={complete ? `magazzino-ordine-completo-${g.numero}` : undefined}>
@@ -390,7 +401,7 @@ export default function Magazzino() {
                           </View>
                           <Text style={styles.resMerce} numberOfLines={1}>{[p.merce, p.destinazione].filter(Boolean).join(" · ")}</Text>
                           <Text style={styles.resMeta} numberOfLines={1}>
-                            {[p.mittente, p.numeroPedane ? `${p.numeroPedane} ped.` : "", p.numeroColli ? `${p.numeroColli} colli` : ""].filter(Boolean).join(" · ")}
+                            {[p.mittente, p.numeroPedane ? `${p.numeroPedane} ped.` : "", p.numeroColli ? `${p.numeroColli} colli` : "", p.oraArrivo ? `arr. ${p.oraArrivo}` : ""].filter(Boolean).join(" · ")}
                           </Text>
                         </View>
                       </Pressable>

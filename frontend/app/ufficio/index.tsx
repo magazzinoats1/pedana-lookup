@@ -5,7 +5,7 @@ import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialDesignIcons } from "@react-native-vector-icons/material-design-icons";
 
-import { api, ApiError, formatDate, formatDateTime, isTrasbordo, Pedana, TOKEN_KEY } from "@/src/api";
+import { api, ApiError, dataArrivoEff, formatDate, formatDateTime, isTrasbordo, Pedana, TOKEN_KEY } from "@/src/api";
 import { AppHeader } from "@/src/components/AppHeader";
 import { statoColor } from "@/src/components/PedanaDetail";
 import { SettingsSheet } from "@/src/components/SettingsSheet";
@@ -61,7 +61,11 @@ export default function Ufficio() {
   useFocusEffect(
     useCallback(() => {
       const t = setTimeout(() => load(q), q ? 250 : 0);
-      return () => clearTimeout(t);
+      const live = setInterval(() => load(q), 30000);
+      return () => {
+        clearTimeout(t);
+        clearInterval(live);
+      };
     }, [q, load]),
   );
 
@@ -121,7 +125,8 @@ export default function Ufficio() {
           {!!o.merce && <Text style={styles.merce} numberOfLines={2}>{o.merce}</Text>}
           <View style={styles.metaGrid}>
             <Meta label="MITTENTE" value={o.mittente} />
-            <Meta label="DATA" value={formatDate(o.dataConsegna)} />
+            <Meta label="ARRIVO" value={`${formatDate(dataArrivoEff(o))}${o.oraArrivo ? ` ${o.oraArrivo}` : ""}`} />
+            <Meta label="CONSEGNA CLIENTE" value={formatDate(o.dataConsegna)} />
             {!!o.numeroColli && <Meta label="COLLI" value={o.numeroColli} />}
             {!!o.numeroPedane && <Meta label="PEDANE" value={o.numeroPedane} />}
             {!!o.agenzia && <Meta label="AGENZIA" value={o.agenzia} />}

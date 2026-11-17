@@ -19,6 +19,8 @@ export type Pedana = {
   numeroColli: string;
   numeroPedane?: string;
   merce: string;
+  dataArrivo?: string;
+  oraArrivo?: string;
   createdAt: string;
   ultimaRettifica: string | null;
   statoArrivo: Stato;
@@ -40,7 +42,7 @@ export type OrdineForm = {
   note: string;
 };
 
-export type PedanaRow = { codice: string; destinazione: string; numeroColli: string; numeroPedane: string; mittente: string; merce: string };
+export type PedanaRow = { codice: string; destinazione: string; numeroColli: string; numeroPedane: string; mittente: string; merce: string; dataArrivo: string; oraArrivo: string };
 
 export type ImportResult = OrdineForm & { pedane: PedanaRow[] };
 
@@ -76,7 +78,7 @@ export async function api<T>(
   }
   if (!res.ok) {
     const j = await res.json().catch(() => ({}));
-    const detail = typeof j.detail === "string" ? j.detail : "Errore del server";
+    const detail = typeof j.detail === "string" ? j.detail : res.status === 422 ? "Dati non validi: controlla i campi" : "Errore del server";
     throw new ApiError(detail, res.status);
   }
   return res.json() as Promise<T>;
@@ -88,6 +90,9 @@ export function isTrasbordo(trasportatore?: string) {
   const t = (trasportatore ?? "").trim();
   return !!t && !/antolini/i.test(t);
 }
+
+// Date the goods arrive at the Antolini warehouse (falls back to customer delivery date)
+export const dataArrivoEff = (p: { dataArrivo?: string; dataConsegna: string }) => p.dataArrivo || p.dataConsegna;
 
 export function formatDate(s: string) {
   if (!s) return "—";

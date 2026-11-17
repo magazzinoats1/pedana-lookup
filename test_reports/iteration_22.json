@@ -1,0 +1,35 @@
+{
+  "summary": "Frontend live-refresh retest (390x844). All 5 requested items PASS: Magazzino count went from 634 to 636 and group magazzino-group-TESTLIVE25654 showed up after about 20s with no page reload. An open pedana-detail-card stayed open, and the search text stayed the same, through 45s of refreshes (with a search) and 25s (without one). ufficio-count went from 634 to 635 by itself after about 28s. Opening /ufficio/form directly by URL and saving goes to /ufficio, the new order is at the top and the form does not get stuck. The ora placeholder is 'HH:MM'. One related problem is left: form-back-button on a form opened directly by URL still calls router.back() with no check, so it logs 'GO_BACK was not handled' and stays on /ufficio/form. All TEST orders were deleted, and searches for them afterwards return [].",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/pedane/tutte", "issue": "Returns the full list (~437KB, ~634 pedane) on every 20s poll per Magazzino device; consider a lightweight change-check (e.g. updatedSince/count/etag) or gzip to reduce mobile data usage."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "ufficio/form.tsx header back button", "issue": "On a form opened directly by URL (or deep link / page reload) the back arrow calls router.back() with no check: console shows 'The action GO_BACK was not handled by any navigator' and the user stays on the form. Reference: /app/frontend/app/ufficio/form.tsx:246", "testID": "form-back-button", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/live_refresh_helper.py"],
+  "action_items": [
+    "form.tsx:246 form-back-button: use the same check as save: router.canGoBack() ? router.back() : router.replace('/ufficio')",
+    "Optional: on error during a background poll, Magazzino replaces the list with the error screen (magazzino-error). Consider keeping the stale list and showing errors only for manual/first loads",
+    "Optional: pause polling when the app is in the background (AppState) to save battery/data on native"
+  ],
+  "critical_code_review_comments": [
+    "magazzino.tsx:120-130 interval is set inside the [q] effect and cleared correctly. setSelectedId(null) runs only when q changes, not on each poll, so selection is kept (verified).",
+    "ufficio/index.tsx:61-67 polling is inside useFocusEffect, so it stops when the screen loses focus. Good.",
+    "magazzino.tsx search(): a background poll sets error, which hides the list on a short network failure."
+  ],
+  "updated_files": ["/app/backend/tests/live_refresh_helper.py (new helper, no app code changed)"],
+  "success_rate": {"backend": "N/A (not requested)", "frontend": "100% of requested items (5/5); 1 related extra bug on the back button"},
+  "seed_data_creation": "Created TEST orders TESTLIVE25654 (2 pedane), TESTUFF25776, TESTFORM25776 and deleted them by id (DELETE returned 200, searches afterwards return []). No real data changed.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Use page.request inside Playwright to log in (POST /api/auth/login {password}) and create/delete TEST pedane. Magazzino poll is 20s, Ufficio 30s (focused only). The DB has ~634 real pedane. Treat them as read-only.",
+  "rca_of_issue": "GO_BACK warning: when /ufficio/form is the first screen in the stack (opened by URL or reload), there is no previous route, so router.back() at form.tsx:246 has nothing to go back to. The save path was fixed with canGoBack(), but the header back button was not."
+}

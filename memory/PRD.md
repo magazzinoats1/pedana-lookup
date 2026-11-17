@@ -35,6 +35,9 @@ User uploaded a KÖLLA transport-order PDF and a reference web app (GestioneLogi
 - Trasportatore per order (default 'Antolini Trasporti', PDF top-left addressee); not Antolini => TRASBORDO badge in Ufficio list, Magazzino groups, detail, Riepilogo, report
 - Same position + same order with different merce merged into ONE row in Magazzino ('N merci' pill); detail lists each merce; marking stato applies to all via PATCH /api/posizioni/stato
 - Big 'Fotografa la posizione' button under Magazzino search (scan → detail with destination opens)
+- Per-pedana dataArrivo/oraArrivo = 'Data/Ora di carico' (arrival at Antolini Verona) from PDF Luogo di carico; dataConsegna = customer delivery. Magazzino date filters, ritardi, Riepilogo and report use arrival date (fallback dataConsegna)
+- PDF import: dataArrivo = Data di carico (partenza fornitore) + 1 giorno; oraArrivo left empty. Backend validates/strips dataArrivo (real date) and oraArrivo; 422 shown as 'Dati non validi'
+- Live refresh: Magazzino list every 20s, Ufficio list every 30s (Riepilogo 15s); form save + back button fall back to /ufficio when no back history; Magazzino background refresh silent (keeps list on network error, paused when app in background); ora placeholder HH:MM
 - Security audit run: SEC-001 default office password (change it), SEC-002 wildcard CORS, hardening: login rate limit, PDF size cap
 
 ## Backlog
@@ -42,3 +45,7 @@ User uploaded a KÖLLA transport-order PDF and a reference web app (GestioneLogi
 - P1: Barcode/label scan for positions (camera)
 - P1: Daily arrivals overview / filters by stato and date
 - P2: Export day report (PDF/CSV) to share with clients
+
+## Update: PDF parsing deterministico
+- /api/import-pdf ora usa prima un parser a regole fisse (PyMuPDF) per il formato KÖLLA: dataConsegna SOLO da "Luogo di scarico", destinazione = destinatario scarico (nome - città), mittente = fornitore in maiuscolo, dataArrivo = data di carico + 1. Risultato identico ogni volta e istantaneo.
+- Se il layout non è riconosciuto, fallback su Gemini con prompt rafforzato.

@@ -14,12 +14,12 @@ import { Button, Field, IconButton } from "@/src/components/ui";
 import { fonts, makeStyles, useTheme } from "@/src/theme";
 
 const emptyForm = { numeroOrdine: "", agenzia: "", trasportatore: TRASPORTATORE_DEFAULT, note: "" };
-const emptyRow: PedanaRow = { codice: "", destinazione: "", numeroColli: "", numeroPedane: "", mittente: "", merce: "" };
+const emptyRow: PedanaRow = { codice: "", destinazione: "", numeroColli: "", numeroPedane: "", mittente: "", merce: "", dataArrivo: "", oraArrivo: "" };
 
 type Errors = {
   numeroOrdine?: string;
   data?: string;
-  rows?: Record<number, { codice?: string; destinazione?: string; mittente?: string }>;
+  rows?: Record<number, { codice?: string; destinazione?: string; mittente?: string; dataArrivo?: string; oraArrivo?: string }>;
   internalDup?: number[];
 };
 type DupResult = { codiceMatches: { codice: string; match: Pedana }[]; numeroMatches: Pedana[] };
@@ -42,6 +42,8 @@ const dayIt = (offset: number) => {
 };
 
 const STICKY_H = 88;
+
+const toApiRow = (r: PedanaRow): PedanaRow => ({ ...r, dataArrivo: itToIso(r.dataArrivo) ?? "", oraArrivo: r.oraArrivo.trim() });
 
 export default function OrdineFormScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -68,7 +70,7 @@ export default function OrdineFormScreen() {
       .then((o) => {
         setForm({ numeroOrdine: o.numeroOrdine, agenzia: o.agenzia, trasportatore: o.trasportatore || TRASPORTATORE_DEFAULT, note: o.note });
         setData(isoToIt(o.dataConsegna));
-        setRows([{ codice: o.codice, destinazione: o.destinazione, numeroColli: o.numeroColli, numeroPedane: o.numeroPedane || "", mittente: o.mittente, merce: o.merce || "" }]);
+        setRows([{ codice: o.codice, destinazione: o.destinazione, numeroColli: o.numeroColli, numeroPedane: o.numeroPedane || "", mittente: o.mittente, merce: o.merce || "", dataArrivo: isoToIt(o.dataArrivo || ""), oraArrivo: o.oraArrivo || "" }]);
       })
       .catch((e) => toast(e.message, "error"))
       .finally(() => setLoading(false));
@@ -125,7 +127,10 @@ export default function OrdineFormScreen() {
   }, [editingId, toast]);
 
   const setF = (k: keyof typeof emptyForm) => (t: string) => setForm((f) => ({ ...f, [k]: t }));
-  const setRow = (i: number, k: keyof PedanaRow, v: string) => setRows((p) => p.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
+  const setRow = (i: number, k: keyof PedanaRow, v: string) => {
+    setRows((p) => p.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
+    setErrors((e) => (e.rows?.[i] ? { ...e, rows: { ...e.rows, [i]: { ...e.rows[i], [k]: undefined } } } : e));
+  };
 
   async function importaPdf() {
     const res = await DocumentPicker.getDocumentAsync({ type: "application/pdf", copyToCacheDirectory: true });
@@ -147,7 +152,7 @@ export default function OrdineFormScreen() {
       setData(isoToIt(r.dataConsegna));
       setRows(
         r.pedane.length
-          ? r.pedane
+          ? r.pedane.map((p) => ({ ...p, dataArrivo: isoToIt(p.dataArrivo) }))
           : [{ ...emptyRow }],
       );
       setErrors({});
@@ -168,7 +173,9 @@ export default function OrdineFormScreen() {
     else if (!iso) e.data = "Formato GG/MM/AAAA";
     const rowErr: Errors["rows"] = {};
     rows.forEach((r, i) => {
-      const re: { codice?: string; destinazione?: string; mittente?: string } = {};
+      const re: { codice?: string; destinazione?: string; mittente?: string; dataArrivo?: string; oraArrivo?: string } = {};
+      if (r.dataArrivo.trim() && !itToIso(r.dataArrivo)) re.dataArrivo = "Formato GG/MM/AAAA";
+      if (r.oraArrivo.trim() && !/^([01]?\d|2[0-3]):[0-5]\d$/.test(r.oraArrivo.trim())) re.oraArrivo = "Formato HH:MM";
       if (!r.codice.trim()) re.codice = "Obbligatorio";
       if (!r.mittente.trim()) re.mittente = "Obbligatorio";
       if (!r.destinazione.trim()) re.destinazione = "Obbligatorio";
@@ -184,14 +191,15 @@ export default function OrdineFormScreen() {
     setSaving(true);
     try {
       if (editingId) {
-        await api(`/pedane/${editingId}`, { method: "PUT", body: { form: payloadForm, pedana: rows[0] } });
+        await api(`/pedane/${editingId}`, { method: "PUT", body: { form: payloadForm, pedana: toApiRow(rows[0]) } });
         toast("Ordine modificato");
       } else {
-        const created = await api<Pedana[]>("/pedane", { method: "POST", body: { form: payloadForm, pedane: rows } });
+        const created = await api<Pedana[]>("/pedane", { method: "POST", body: { form: payloadForm, pedane: rows.map(toApiRow) } });
         toast(created.length > 1 ? `${created.length} pedane registrate` : "Ordine registrato");
       }
       setDup(null);
-      router.back();
+      if (router.canGoBack()) router.back();
+      else router.replace("/ufficio");
     } catch (e: any) {
       toast(e.message, "error");
     } finally {
@@ -235,7 +243,7 @@ export default function OrdineFormScreen() {
   return (
     <View style={styles.root}>
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <IconButton icon="arrow-left" tone="onBrand" onPress={() => router.back()} testID="form-back-button" />
+        <IconButton icon="arrow-left" tone="onBrand" onPress={() => (router.canGoBack() ? router.back() : router.replace("/ufficio"))} testID="form-back-button" />
         <Text style={styles.headerTitle}>{editingId ? "Modifica Ordine" : "Nuovo Ordine"}</Text>
       </View>
 
@@ -301,7 +309,7 @@ export default function OrdineFormScreen() {
           )}
           <Field label="Agenzia" value={form.agenzia} onChangeText={setF("agenzia")} placeholder="Chi ha ordinato" testID="form-agenzia-input" />
           <Field
-            label="Data consegna *"
+            label="Data consegna cliente *"
             value={data}
             onChangeText={setData}
             placeholder="GG/MM/AAAA"
@@ -360,6 +368,14 @@ export default function OrdineFormScreen() {
                   </View>
                 </View>
                 <Field label="Tipo merce" value={r.merce} onChangeText={(t) => setRow(i, "merce", t)} placeholder="es. Uva rossa senza semi, Radicchio…" testID={`form-pedana-merce-input-${i}`} />
+                <View style={styles.twoCol}>
+                  <View style={styles.flex2}>
+                    <Field label="Arrivo in magazzino" value={r.dataArrivo} onChangeText={(t) => setRow(i, "dataArrivo", t)} placeholder="GG/MM/AAAA" keyboardType="numbers-and-punctuation" error={re?.dataArrivo} hint="Giorno dopo la partenza dal fornitore" testID={`form-pedana-data-arrivo-input-${i}`} />
+                  </View>
+                  <View style={styles.flex}>
+                    <Field label="Ora" value={r.oraArrivo} onChangeText={(t) => setRow(i, "oraArrivo", t)} placeholder="HH:MM" keyboardType="numbers-and-punctuation" error={re?.oraArrivo} testID={`form-pedana-ora-arrivo-input-${i}`} />
+                  </View>
+                </View>
               </Animated.View>
             );
           })}

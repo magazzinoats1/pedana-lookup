@@ -1,0 +1,35 @@
+{
+  "summary": "Tested the dataArrivo/oraArrivo feature (date the pallet arrives at Antolini Verona) end to end. Backend: new file test_data_arrivo.py, 4 of 4 tests pass. (1) POST /api/import-pdf with the sample PDF returns dataConsegna 2026-10-14; the 2 ORCHIDEA rows have 2026-10-12 15:00 and the 4 BERTOLI FRUIT / MORANDO rows have 2026-10-13 15:00. (2) POST /api/pedane saves dataArrivo/oraArrivo and GET returns them. (3) PUT updates them and GET confirms. (4) GET /api/riepilogo?data=X returns a pedana with dataArrivo==X and an old-style pedana (empty dataArrivo) with dataConsegna==X. It does NOT return a pedana with dataArrivo=X-1 and dataConsegna=X; that pedana appears under X-1. Frontend (390x844; the test machine clock reads 2026-11-13): the form shows the label 'Data consegna cliente *'. Row inputs form-pedana-data-arrivo-input-0 (placeholder GG/MM/AAAA) and form-pedana-ora-arrivo-input-0 (placeholder 15:00) work. Entering 32/13/2026 shows 'Formato GG/MM/AAAA' and blocks saving. Saving with today's date stored ISO 2026-11-13 14:30 (checked via the API), with dataConsegna 2026-11-14. Edit loads 13/11/2026, 14:30 and 14/11/2026 back. Changing the time to 16:00 in edit was saved (PUT, checked via the API). The Ufficio card shows 'ARRIVO 13/11/2026 14:30' and 'CONSEGNA CLIENTE 14/11/2026'. Magazzino: the TEST order appears under Oggi and not under Domani. The group summary reads 'Arrivo 13/11/2026 · 1 posizione', the row meta reads 'TEST MITT · arr. 14:30' and the 'In ritardo' badge shows (correct, because it was 21:14). The detail shows ARRIVO MAGAZZINO 13/11/2026 14:30 and CONSEGNA CLIENTE 14/11/2026. The Oggi count (15) matches the Riepilogo pedane stat (15). Riepilogo for today includes the TEST order and its pedana; tomorrow does not. PDF import in the UI fills all 6 rows with the converted GG/MM/AAAA arrival dates and the times. The TEST pedana was deleted afterwards (GET now returns 404). No real data was changed. No deprecated Expo packages found.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST/PUT /api/pedane", "issue": "dataArrivo and oraArrivo are not checked at all on the server. Any string is stored, e.g. 'abc' or '25:99'. Add a Pydantic pattern: empty, or YYYY-MM-DD for the date and HH:MM for the time."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Magazzino group header", "issues": ["The 'Arrivo dd/mm/yyyy' summary uses only the first item's date (g.items[0]). When an order's pallets arrive on different days, which is exactly what the sample PDF has (12/10 and 13/10), the 'Tutte' view shows just one date for the whole order. Consider showing the date range or one date per row."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_data_arrivo.py", "/app/test_reports/pytest/pytest_data_arrivo.xml"],
+  "action_items": [
+    "Logic gap, low priority: the 'In ritardo' rule in src/ritardi.ts:12 uses a fixed cutoff (ORA_RITARDO = 14) and ignores the new oraArrivo. A pallet scheduled to arrive at 15:00 (the time in the sample PDF) is already flagged as late at 14:00, before it is due. Consider using max(ORA_RITARDO, oraArrivo hour), or oraArrivo when it is set.",
+    "Form: oraArrivo is free text with no validation. Add a check for HH:MM, the same way the date field is checked.",
+    "Backend: add pattern validation for dataArrivo and oraArrivo in PedanaIn.",
+    "Stale regression tests, not related to this feature: test_backend.py (stato), test_operatore.py, test_scarica_ordine.py and test_riepilogo.py::TestRiepilogoLiveStateUpdate fail with 401 'Accedi con nome e PIN' because stato changes now require a magazziniere PIN session. test_pin_archive.py errors at collection with KeyError 'EXPO_PUBLIC_BACKEND_URL'. Update these tests to log in a TEST magazziniere and to use the conftest BASE_URL."
+  ],
+  "critical_code_review_comments": [
+    "The dataArrivoEff fallback (dataArrivo || dataConsegna) is applied the same way in magazzino, ritardi, PedanaDetail, the ufficio list and the report. It matches the backend $or query in riepilogo.",
+    "The full suite (-n 2) showed extra failures caused by tests sharing state in parallel. Run serially (-n 0); then only the stale PIN-auth tests above fail."
+  ],
+  "updated_files": ["/app/backend/tests/test_data_arrivo.py"],
+  "success_rate": {"backend": "100% (4/4 new feature tests)", "frontend": "100%"},
+  "seed_data_creation": "Created and deleted (by id) the TEST_ARR_A/B/C_* pedane in pytest and TEST_ARR_UI_1794604460 in the UI test. Nothing is left over.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "The test machine clock reads 2026-11-13 (UTC). The Ufficio login sheet needs about 1.2 s of animation before clicking ufficio-login-button, otherwise you get 'outside of viewport'. PDF import in the UI works with page.expect_file_chooser on form-import-pdf-button and takes about 15 s. Run pytest serially with -n 0 for reliable results.",
+  "rca_of_issue": ""
+}

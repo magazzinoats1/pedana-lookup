@@ -3,7 +3,7 @@ import { Text, View } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { MaterialDesignIcons } from "@react-native-vector-icons/material-design-icons";
 
-import { formatDate, formatDateTime, isTrasbordo, Pedana } from "@/src/api";
+import { dataArrivoEff, formatDate, formatDateTime, isTrasbordo, Pedana } from "@/src/api";
 import { StatoToggle } from "@/src/components/StatoToggle";
 import { InfoTile } from "@/src/components/ui";
 import { fonts, makeStyles, useTheme } from "@/src/theme";
@@ -72,7 +72,13 @@ export function PedanaDetail({
 
       <View style={styles.grid}>
         <InfoTile label="MITTENTE" value={pedana.mittente} icon="truck-delivery-outline" testID="pedana-detail-mittente" />
-        <InfoTile label="DATA CONSEGNA" value={formatDate(pedana.dataConsegna)} icon="calendar" testID="pedana-detail-data" />
+        <InfoTile
+          label="ARRIVO MAGAZZINO"
+          value={`${formatDate(dataArrivoEff(pedana))}${pedana.oraArrivo ? ` ${pedana.oraArrivo}` : ""}`}
+          icon="warehouse"
+          testID="pedana-detail-data-arrivo"
+        />
+        <InfoTile label="CONSEGNA CLIENTE" value={formatDate(pedana.dataConsegna)} icon="calendar" testID="pedana-detail-data" />
         <InfoTile label="N° PEDANE" value={pedana.numeroPedane ?? ""} icon="layers-triple-outline" testID="pedana-detail-numero-pedane" />
         <InfoTile label="N° COLLI" value={pedana.numeroColli} icon="package-variant-closed" testID="pedana-detail-colli" />
         <InfoTile label="AGENZIA" value={pedana.agenzia} icon="domain" testID="pedana-detail-agenzia" />

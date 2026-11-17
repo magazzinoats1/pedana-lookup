@@ -16,7 +16,7 @@ from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Literal
 
 import bcrypt
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from emergentintegrations.llm.chat import LlmChat, UserMessage, FileContentWithMimeType, TextDelta, StreamDone
 
@@ -83,6 +83,8 @@ class Pedana(BaseDocument):
     numeroColli: str = ""
     numeroPedane: str = ""
     merce: str = ""
+    dataArrivo: str = ""
+    oraArrivo: str = ""
     createdAt: str = Field(default_factory=now_iso)
     ultimaRettifica: Optional[str] = None
     statoArrivo: Literal["attesa", "parziale", "completo"] = "attesa"
@@ -112,6 +114,20 @@ class PedanaIn(BaseModel):
     numeroPedane: str = ""
     mittente: str = ""
     merce: str = ""
+    dataArrivo: str = Field(default="", pattern=r"^(\d{4}-\d{2}-\d{2})?$")
+    oraArrivo: str = Field(default="", pattern=r"^(([01]?\d|2[0-3]):[0-5]\d)?$")
+
+    @field_validator("dataArrivo", "oraArrivo", mode="before")
+    @classmethod
+    def _strip(cls, v):
+        return v.strip() if isinstance(v, str) else v
+
+    @field_validator("dataArrivo")
+    @classmethod
+    def _data_valida(cls, v: str):
+        if v:
+            datetime.strptime(v, "%Y-%m-%d")
+        return v
 
 
 class CreateReq(BaseModel):
@@ -387,7 +403,7 @@ async def get_pedana(pid: str):
 
 @api.get("/riepilogo", response_model=List[Pedana])
 async def riepilogo(data: str = Query(..., pattern=r"^\d{4}-\d{2}-\d{2}$"), _=Depends(require_ufficio)):
-    docs = await db.pedane.find({"dataConsegna": data}).sort([("numeroOrdine", 1), ("codice", 1)]).to_list(2000)
+    docs = await db.pedane.find({"$or": [{"dataArrivo": data}, {"dataArrivo": {"$in": ["", None]}, "dataConsegna": data}]}).sort([("numeroOrdine", 1), ("codice", 1)]).to_list(2000)
     return [Pedana.from_mongo(d) for d in docs]
 
 
@@ -424,6 +440,7 @@ async def create_pedane(body: CreateReq, _=Depends(require_ufficio)):
             mittente=(p.mittente.strip() or f.mittente.strip()), dataConsegna=f.dataConsegna,
             note=f.note.strip(), codice=p.codice.strip(), destinazione=p.destinazione.strip(),
             numeroColli=p.numeroColli.strip(), numeroPedane=p.numeroPedane.strip(), merce=p.merce.strip(),
+            dataArrivo=p.dataArrivo.strip(), oraArrivo=p.oraArrivo.strip(),
         )
         await db.pedane.insert_one(item.to_mongo())
         created.append(item)
@@ -437,7 +454,8 @@ async def update_pedana(pid: str, body: UpdateReq, _=Depends(require_ufficio)):
         "numeroOrdine": f.numeroOrdine.strip(), "agenzia": f.agenzia.strip(), "trasportatore": f.trasportatore.strip(),
         "mittente": (p.mittente.strip() or f.mittente.strip()), "dataConsegna": f.dataConsegna,
         "note": f.note.strip(), "codice": p.codice.strip(), "destinazione": p.destinazione.strip(),
-        "numeroColli": p.numeroColli.strip(), "numeroPedane": p.numeroPedane.strip(), "merce": p.merce.strip(), "ultimaRettifica": now_iso(),
+        "numeroColli": p.numeroColli.strip(), "numeroPedane": p.numeroPedane.strip(), "merce": p.merce.strip(),
+        "dataArrivo": p.dataArrivo.strip(), "oraArrivo": p.oraArrivo.strip(), "ultimaRettifica": now_iso(),
     }
     res = await db.pedane.find_one_and_update({"id": pid}, {"$set": patch}, return_document=True)
     if not res:
@@ -557,13 +575,134 @@ Rispondi SOLO con JSON valido, senza testo extra, con questa struttura esatta:
   "numeroOrdine": "numero dell'ordine di trasporto (es. 25023467)",
   "agenzia": "azienda che ha emesso/commissionato l'ordine (es. KÖLLA GmbH & Co. KG)",
   "trasportatore": "trasportatore a cui è indirizzato l'ordine, scritto IN ALTO A SINISTRA come destinatario (es. Antolini s.r.l.)",
-  "dataConsegna": "data di scarico/consegna in formato YYYY-MM-DD",
+  "dataConsegna": "data di consegna al CLIENTE finale (sezione Luogo di scarico, Data di scarico) in formato YYYY-MM-DD",
   "note": "istruzioni importanti brevi (temperatura, avvisi), max 200 caratteri",
   "pedane": [
-    {"codice": "codice posizione CORTO stampato SOTTO il codice lungo, nel formato NNNN-NNNNNN (es. 2619-019320, 2619-019318, 2619-019321). NON usare il codice lungo sopra (es. 2619-019320-10000 o A2619-023221-10000)", "destinazione": "nome destinatario + città (luogo di scarico)", "numeroColli": "numero colli (valore K0/KO) come intero senza decimali", "numeroPedane": "numero di pedane della colonna Pedane (es. 1,00 EUR = 1; 2,00 EUR = 2; 0,00 = 0), stampato sopra il codice posizione corto, come intero senza decimali", "mittente": "nome stampato A DESTRA della riga, in cima alla colonna tipologia merce (es. ORCHIDEA, BERTOLI FRUIT, MORANDO GRAZIANO). Scrivilo in maiuscole come nel documento, senza descrizione merce", "merce": "tipo di merce breve (es. Uva rossa senza semi, Uva bianca senza semi, Radicchio Trevisano, Radicchio Castelfranco)"}
+    {"codice": "codice posizione CORTO stampato SOTTO il codice lungo, nel formato NNNN-NNNNNN (es. 2619-019320, 2619-019318, 2619-019321). NON usare il codice lungo sopra (es. 2619-019320-10000 o A2619-023221-10000)", "destinazione": "nome destinatario + città (luogo di scarico)", "numeroColli": "numero colli (valore K0/KO) come intero senza decimali", "numeroPedane": "numero di pedane della colonna Pedane (es. 1,00 EUR = 1; 2,00 EUR = 2; 0,00 = 0), stampato sopra il codice posizione corto, come intero senza decimali", "mittente": "nome stampato A DESTRA della riga, in cima alla colonna tipologia merce (es. ORCHIDEA, BERTOLI FRUIT, MORANDO GRAZIANO). Scrivilo in maiuscole come nel documento, senza descrizione merce", "dataCarico": "Data di carico della riga nella sezione Luogo di carico (partenza dal fornitore), formato YYYY-MM-DD", "merce": "tipo di merce breve (es. Uva rossa senza semi, Uva bianca senza semi, Radicchio Trevisano, Radicchio Castelfranco)"}
   ]
 }
-Includi OGNI riga presente nella sezione Luogo di carico (non ripetere le righe della sezione Luogo di scarico). Se un dato manca usa stringa vuota."""
+Includi OGNI riga presente nella sezione Luogo di carico (non ripetere le righe della sezione Luogo di scarico). Se un dato manca usa stringa vuota.
+ATTENZIONE: la dataConsegna è SOLO la data della sezione "Luogo di scarico" (consegna al cliente), MAI la data di carico o la data di arrivo al magazzino Antolini.
+La destinazione è SOLO il destinatario della sezione "Luogo di scarico", MAI il luogo di carico/fornitore e MAI Antolini. Il mittente è SOLO il fornitore (nome in maiuscolo sulla riga)."""
+
+
+def giorno_dopo(iso: str) -> str:
+    try:
+        return (datetime.strptime(iso, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+    except ValueError:
+        return ""
+
+
+NOISE = ("Operiamo", "PHG:", "Sitz ", "Geschäftsführer", "KÖLLA GmbH & Co. KG", "Bank:", "Kontonummer",
+         "IBAN:", "BIC:", "HOTLINE:", "Logistik-IT", "Pagina ")
+RX_DATE = re.compile(r"^(\d{2})\.(\d{2})\.(\d{4})$")
+RX_TIME = re.compile(r"^\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2}$")
+RX_LONG = re.compile(r"^A?\d{4}-\d{6}-\d+$")
+RX_SHORT = re.compile(r"^\d{4}-\d{6}$")
+MERCE_SKIP = re.compile(r"\d|rinfusa|^cl\.|collo|cartone|epal|polistirolo|lux|extra", re.I)
+
+
+def iso(d: str) -> str:
+    m = RX_DATE.match(d)
+    return f"{m.group(3)}-{m.group(2)}-{m.group(1)}" if m else ""
+
+
+def num(s: str) -> str:
+    return re.sub(r"[.,]0+$", "", re.sub(r"\s*(KO|EUR)\s*$", "", s.strip()))
+
+
+def merce_breve(desc: str) -> str:
+    parts = [p.strip() for p in desc.split(",")]
+    if "IT" not in parts:
+        return parts[0] if parts else ""
+    i = parts.index("IT")
+    out = parts[:i]
+    if i + 1 < len(parts) and parts[i + 1] and not MERCE_SKIP.search(parts[i + 1]):
+        out.append(parts[i + 1])
+    return " ".join(out)
+
+
+def luogo(line: str) -> tuple:
+    """'Name - Street - D 81371 München' -> (name, city)."""
+    parts = [p.strip() for p in line.split(" - ")]
+    city = re.sub(r"\[.*?\]|\(.*?\)", "", parts[-1])
+    city = re.sub(r"^[A-Z]{1,2}[\s-]*\d{4,5}\s*", "", city.strip()).strip()
+    return parts[0], city
+
+
+def parse_rows(lines: list) -> list:
+    """Each row is anchored on the long position code; returns rows with the context above/below it."""
+    rows, place = [], ""
+    for i, ln in enumerate(lines):
+        if " - " in ln and not RX_TIME.match(ln) and not ln.startswith("Temperatura"):
+            place = ln
+        if not RX_LONG.match(ln):
+            continue
+        before = lines[max(0, i - 3):i]
+        data = next((iso(x) for x in before if RX_DATE.match(x)), "")
+        j, colli, ped, desc, short = i + 1, "", "", [], ""
+        while j < len(lines) and not RX_LONG.match(lines[j]):
+            x = lines[j]
+            if x.endswith("KO") and not colli:
+                colli = num(x)
+            elif x.endswith("EUR") and not ped:
+                ped = num(x)
+            elif RX_SHORT.match(x):
+                short = x
+                break
+            elif ped and re.search(r"[A-Za-z]", x):
+                desc.append(x)
+            j += 1
+        rows.append({"long": ln, "short": short, "data": data, "place": place, "colli": colli, "pedane": ped,
+                     "mittente": re.sub(r"\s+S\.?R\.?L?\.?$", "", lines[i - 1].strip()).strip(),
+                     "merce": merce_breve(" ".join(desc))})
+    return rows
+
+
+def parse_ordine_pdf(path: str) -> Optional[dict]:
+    """Deterministic parser for KÖLLA transport orders (fixed layout). None if the layout is not recognised."""
+    import pymupdf
+    with pymupdf.open(path) as doc:
+        raw = "\n".join(p.get_text() for p in doc)
+    lines = [ln.strip() for ln in raw.splitlines()]
+    lines = [ln for ln in lines if ln and not ln.startswith(NOISE)]
+    m = re.search(r"Ordine di trasporto\s*-\s*(\d+)", raw)
+    cut = next((i for i, ln in enumerate(lines) if ln.startswith("Luogo di scarico")), None)
+    if not m or cut is None:
+        return None
+    carico, scarico = parse_rows(lines[:cut]), parse_rows(lines[cut:])
+    if not carico:
+        return None
+    dest = {}
+    for r in scarico:
+        dest.setdefault(r["long"], r)
+    consegne = sorted({r["data"] for r in scarico if r["data"]})
+    head = next((i for i, ln in enumerate(lines) if ln.startswith("Ordine di trasporto")), 0)
+    trasp = next((ln for ln in reversed(lines[:head]) if not ln.endswith(":")), "")
+    ag = re.search(r"^(.+?)\s*\|", raw, re.M)
+    note = [ln for ln in lines[:cut] if ln.startswith("Temperatura di trasporto")][:1]
+    start = next((i for i, ln in enumerate(lines) if ln.startswith("Targa")), -1)
+    end = next((i for i, ln in enumerate(lines) if ln.startswith("Luogo di carico")), -1)
+    if 0 <= start < end:
+        note = [ln for ln in lines[start + 1:end] if not ln.endswith(":")] + note
+    pedane = []
+    for r in carico:
+        d = dest.get(r["long"])
+        nome, citta = luogo(d["place"]) if d and d["place"] else ("", "")
+        pedane.append({
+            "codice": r["short"] or re.sub(r"^A", "", r["long"]).rsplit("-", 1)[0],
+            "destinazione": f"{nome} - {citta}" if citta else nome,
+            "numeroColli": r["colli"], "numeroPedane": r["pedane"],
+            "mittente": r["mittente"], "merce": r["merce"],
+            # Goods leave the supplier on the loading date and reach the Antolini warehouse the next day
+            "dataArrivo": giorno_dopo(r["data"]), "oraArrivo": "",
+        })
+    return {
+        "numeroOrdine": m.group(1), "agenzia": ag.group(1).strip() if ag else "",
+        "trasportatore": trasp, "mittente": "",
+        "dataConsegna": consegne[0] if consegne else "",
+        "note": " · ".join(note)[:200], "pedane": pedane,
+    }
 
 
 def extract_json(text: str) -> dict:
@@ -582,6 +721,14 @@ async def import_pdf(file: UploadFile = File(...), _=Depends(require_ufficio)):
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
         tmp.write(data)
         path = tmp.name
+    try:
+        fixed = parse_ordine_pdf(path)
+    except Exception:
+        logger.exception("Deterministic PDF parse failed, falling back to AI")
+        fixed = None
+    if fixed:
+        os.unlink(path)
+        return fixed
     try:
         chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=f"pdf-{uuid.uuid4()}",
                        system_message="Estrai dati strutturati da documenti logistici. Rispondi solo in JSON.") \
@@ -610,6 +757,9 @@ async def import_pdf(file: UploadFile = File(...), _=Depends(require_ufficio)):
             "numeroPedane": re.sub(r"[.,]0+$", "", str(p.get("numeroPedane") if p.get("numeroPedane") is not None else "").replace("EUR", "").strip()),
             "mittente": str(p.get("mittente", "") or "").strip(),
             "merce": str(p.get("merce", "") or "").strip(),
+            # Goods leave the supplier on the loading date and reach the Antolini warehouse the next day
+            "dataArrivo": giorno_dopo(str(p.get("dataCarico", "") or "").strip()[:10]),
+            "oraArrivo": "",
         })
     return {
         "numeroOrdine": str(parsed.get("numeroOrdine", "") or "").strip(),

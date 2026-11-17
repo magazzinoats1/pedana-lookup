@@ -1,0 +1,29 @@
+{
+  "summary": "All requested items pass at 390x844 against the public URL. Backend: 18/18 tests pass (new test_iter21_pdf_arrivo.py plus the test_arrivo_validation.py regression). PDF import was run twice. New PDF (Ankara): numeroOrdine 25024224, dataConsegna 2026-11-16, 3 pedane (2619-021262 ORCHIDEA, 2619-021304 FRUTTA ITALIA V. x2), all with dataArrivo 2026-11-14 and oraArrivo ''. Old PDF: dataConsegna 2026-10-14, ORCHIDEA arrives 2026-10-13, the others 2026-10-14, oraArrivo ''. POST with '15:00 ' or ' 15:00 ' returns 200 and stores '15:00'. dataArrivo '2026-13-45', '2026-02-30' and '2026-00-10' return 422 on POST, and PUT with '2026-13-45' returns 422 without saving any change. Frontend: drag&drop of the new PDF fills 3 rows with Arrivo in magazzino 14/11/2026, empty Ora and the hint 'Giorno dopo la partenza dal fornitore' (shown 3 times). Typing 'abc' and saving shows 'Formato HH:MM' plus the 'Compila i campi obbligatori' toast, and the error disappears while typing the fix. A trailing-space '15:00 ' is sent as '15:00' and stored; after the GET check, all 3 pedane had dataArrivo 2026-11-14. A 422 with an array detail (mocked with page.route) shows the toast 'Dati non validi: controlla i campi', not 'Errore del server'. One minor issue: router.back() after save fails when /ufficio/form is opened directly (no history). Deprecated packages: none (no expo-av, expo-barcode-scanner or expo-background-fetch). SafeAreaView issues: none (no SafeAreaView from react-native).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "form.tsx doSave (line ~201)", "issue": "After a successful save, router.back() throws 'The action GO_BACK was not handled' when the form was opened by direct URL or after a browser refresh (no navigation history). The data is saved, but the user stays on the filled form, so they may save again and create duplicate pedane. Fix: router.canGoBack() ? router.back() : router.replace('/ufficio').", "testID": "form-save-button", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Ufficio form", "issues": ["The Ora placeholder is '15:00'. After a PDF import, the gray placeholder can look like a prefilled supplier time, which is the confusion the user just clarified. Consider the placeholder 'HH:MM'."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_iter21_pdf_arrivo.py", "/app/backend/tests/test_arrivo_validation.py", "/app/test_reports/pytest/iter21.xml"],
+  "action_items": [
+    "LOW: form.tsx doSave: when there is no history, call router.replace('/ufficio') instead of router.back()",
+    "LOW (optional): change the Ora placeholder '15:00' to 'HH:MM'"
+  ],
+  "critical_code_review_comments": [
+    "PedanaIn: the mode='before' strip runs before the pattern check and strptime rejects impossible dates, which is correct. The .strip() calls in create/update are now redundant but harmless.",
+    "import_pdf: giorno_dopo returns '' for a missing or invalid dataCarico, so the arrival date then falls back to dataConsegna through dataArrivoEff. This is acceptable."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter21_pdf_arrivo.py"],
+  "success_rate": {"backend": "100% (18/18)", "frontend": "100% of requested flows"},
+  "seed_data_creation": "Created 3 pedane from the form with numeroOrdine TEST_I21_UI_1794605078, deleted by id afterwards (all return 404). Backend tests create TEST_I21_* and TEST_VAL_* records and delete them by id in teardown. No real data was modified.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Login: click accesso-ufficio-button, wait 1s for the sheet animation, fill ufficio-password-input, then dispatch_event('click') on ufficio-login-button (a normal click fails with 'outside viewport' during the animation). For drag&drop, read /tmp/new.pdf (download it from the PDF URL), base64 it into the page, build a File/DataTransfer, and dispatch dragenter+drop on document. Gemini PDF import takes about 10s."
+}

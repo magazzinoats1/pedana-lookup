@@ -1,0 +1,39 @@
+{
+  "summary": "All 4 requested fixes verified at 390x844 against the public URL. Backend: 13/14 new+regression tests pass (POST oraArrivo '25:99'/'abc'/'24:00' -> 422, dataArrivo '13/11/2026'/'2026-1-5' -> 422, valid '2026-11-13'+'15:00' -> 200 persisted, empty strings -> 200, PUT 'abc' -> 422 with no change saved, PDF import still extracts 2026-10-12/13 15:00). Form: 'abc', '25:99' and '1500' show 'Formato HH:MM', save is blocked and no POST is sent; '15:00' saves (200, persisted). Ritardo checked with page clock: the 16:00 pedana is not late at 15:00 or 15:59 and is late at 16:00 and 16:30; the pedana with no ora is not late at 13:59 and is late at 14:30. Magazzino group summary shows 'Arrivo 12/11, 14/11 · 2 posizioni' (sorted). One minor edge-case bug: a time with spaces around it, e.g. '15:00 ', passes form validation but the backend returns 422 and the user sees only 'Errore del server'. Deprecated packages / SafeAreaView issues: none checked in this scope.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST/PUT /api/pedane", "issue": "The PedanaIn pattern runs before the .strip() in create/update, so ' 15:00 ' is rejected with 422 even though the server would trim it anyway. The frontend validates the trimmed value but sends the raw value (toApiRow does not trim oraArrivo)."},
+      {"endpoint": "POST /api/pedane", "issue": "The dataArrivo pattern only checks the shape, so impossible dates like '2026-13-45' are accepted (not tested in UI; the frontend itToIso probably prevents this)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "form.tsx toApiRow", "issue": "If the user types '15:00 ' (trailing space, common on mobile keyboards), the backend returns 422 and the user sees a generic 'Errore del server' toast and cannot tell what to fix.", "testID": "form-pedana-ora-arrivo-input-0", "priority": "MEDIUM"},
+      {"component": "src/api.ts:81", "issue": "Any 422 validation error (where detail is an array) is shown as 'Errore del server', a misleading message for a validation problem.", "testID": "form-save-button", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Ufficio form", "issues": ["The 'Formato HH:MM' error stays visible after the user types a valid value, until the next save (stale error state).", "The Ora field is the last field in the row, so its error text sits behind the sticky 'Registra ordine' footer; the user only sees the 'Compila i campi obbligatori' toast and the red border."]},
+      {"screen": "Magazzino", "issues": ["magazzino-group-summary uses numberOfLines=1, so an order with many arrival dates will cut off the position, pedane and colli counts."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_arrivo_validation.py", "/app/backend/tests/test_data_arrivo.py", "/app/backend/tests/seed_ritardo_ui.py", "/app/test_reports/pytest/pytest_arrivo_validation.xml"],
+  "action_items": [
+    "In form.tsx toApiRow, trim oraArrivo (and ideally all string fields) before sending, e.g. {...r, oraArrivo: r.oraArrivo.trim(), dataArrivo: itToIso(r.dataArrivo) ?? ''}. Optionally also strip in the backend with a field_validator(mode='before') on PedanaIn.",
+    "In src/api.ts, map a 422 whose detail is an array to a clear message (e.g. 'Dati non validi: ' + detail[0].loc.at(-1)) instead of 'Errore del server'.",
+    "Optional: clear row errors in setRow when the user edits a field."
+  ],
+  "critical_code_review_comments": [
+    "ritardi.ts: the logic is correct, cutoff = max(14:00, oraArrivo), applied only to pedane in 'attesa' arriving today. It uses the device's local time, which is fine.",
+    "PDF import sanitization (server.py:619-620) uses the same regexes as PedanaIn, so they are consistent.",
+    "server.py is 722 lines, over the 700-line guideline; consider splitting it."
+  ],
+  "updated_files": ["/app/backend/tests/test_arrivo_validation.py (new)", "/app/backend/tests/seed_ritardo_ui.py (new helper)"],
+  "success_rate": {"backend": "93% (13/14; the only failure is the padded-time edge case)", "frontend": "100% of requested flows"},
+  "seed_data_creation": "TEST orders TESTRIT*/TESTGRP*/TESTFORM*/TEST_VAL_*/TEST_ARR_* were created and then deleted by id. A rejected TESTPAD* was never created. No TESTX order was found. /pedane/tutte shows no TEST* leftovers.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Browser TZ is UTC and the machine date is 2026-11-13. page.clock.set_fixed_time('2026-11-13T15:00:00') before page.goto works for ritardo checks. Run 'python seed_ritardo_ui.py create|delete' from /app/backend/tests to create and remove the UI test data (it writes /tmp/seed_ritardo_ui.json). /pedane/tutte is capped at 1000 rows (562 currently)."
+}

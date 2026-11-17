@@ -1,0 +1,24 @@
+{
+  "summary": "Frontend retest at 390x844 of the form-back-button fallback and the silent Magazzino background refresh. All 3 requested flows pass. (1) After office login, opening /ufficio/form directly by URL, and also after a reload, then tapping form-back-button leads to /ufficio with the list visible. No GO_BACK error and no console errors. Normal push then back also works. (2) With /api/pedane/tutte aborted for 45s, 2 background refreshes failed and the list (634 pedane, 193 ordini) stayed on screen. No magazzino-error and no spinner appeared. After unblocking, the next refresh returned 200 and the list stayed normal. (3) Regression: a TEST order created through the API showed up in Magazzino after 20.1s (count went from 634 to 635) while a detail was open. The detail stayed open and the TEST group appeared in the list. The TEST order was deleted (GET afterwards returned 404) and the DB is back to 634 pedane.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [".screenshots/back_direct.png", ".screenshots/mag_blocked.png", ".screenshots/mag_detail.png"],
+  "action_items": [
+    "Optional (minor): in magazzino.tsx search(), a successful silent refresh does not clear an `error` left by an earlier failed non-silent search. The error screen then stays until the user taps Riprova, even after the network is back. Consider calling setError('') when a silent refresh succeeds."
+  ],
+  "critical_code_review_comments": [
+    "magazzino.tsx:111-114: the silent path never resets `error` on success. This only matters when the first, non-silent load failed.",
+    "magazzino.tsx is 640 lines, close to the 700-line limit. Consider extracting the operatore/PIN sheet and groupByOrder."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A", "frontend": "100%"},
+  "seed_data_creation": "One TEST order (TEST<timestamp>) created through the API and deleted by id. No real data was changed.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Office login sheet: wait about 1s after it opens before clicking ufficio-login-button. Clicking during the slide-in animation fails with 'outside of viewport'. Use page.route abort on **/api/pedane/tutte* to test offline. Magazzino polls every 20s. The DB has 634 real pedane and must be treated as read-only."
+}
