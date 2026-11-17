@@ -1,0 +1,33 @@
+{
+  "summary": "Frontend-only regression smoke test after the upgrade to Expo SDK 58, at a 375x667 mobile viewport. Installed versions: expo 58.0.26, expo-router 58.0.32, RN 0.88.1, React 19.3.0, RNW 0.21.4, reanimated 4.7.1. `expo install --check` reports 'Dependencies are up to date'. Every requested flow passes, with zero console errors, warnings or page errors and no red screen. Landing: the splash shows, then accesso-screen. Accesso Ufficio: the password sheet opens, a wrong password shows 'Password errata', and antolini2024 opens /ufficio (634 pedane, cards render). Nuovo Ordine (/ufficio/form): the form renders, accepts typing and adds a second pedana row; the back button returns to /ufficio. Riepilogo: renders, the Oggi -> Ieri day nav works, back works. Settings -> Magazzinieri e PIN: renders 2 workers, back works. Settings -> Archivio: renders, empty, back works. Magazzino: the list loads (634 pedane, 193 ordini, ritardi + da-scaricare banners). Status filters work (attesa/tutte/parziale/completo, with the empty state on parziale/completo), as do the date filters (oggi 15, domani 4, tutte 634). Tapping a list item opens PedanaDetail and back returns to the list. Partial search '2619' returns 30 results, and the detail opens with codice/ordine/destinazione/mittente/data/colli. The exact code '2619-021270' matches 2 orders, so the list shows (correct). Junk input shows magazzino-no-results, clear restores the list, the operatore sheet lists the workers, and Esci returns to /. No deprecated packages (expo-av / expo-barcode-scanner / expo-background-fetch) and no SafeAreaView from react-native.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/pedane/cerca", "issue": "server.py:387: a partial-match search is silently capped at 30 results. 583 pedane match '2619', but the UI says '30 pedane trovate · 16 ordini', which suggests that is the full total. This behaviour existed before the upgrade (not an SDK regression)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Magazzino (web only)", "issues": ["The search TextInput (testID magazzino-search-input, autoFocus) shows the browser's dark rectangular focus ring inside the rounded blue input wrapper. The style sets outlineWidth: 0, but the computed outline-style is still 'auto', and Chromium draws that ring anyway. Fix: add outlineStyle: 'none' at magazzino.tsx:614. Cosmetic, web preview only."]},
+      {"screen": "Ufficio list header", "issues": ["At 375px the title 'Gestione ...' and the subtitle 'Cooperativa no...' are truncated next to the 3 header icon buttons. This is minor."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [".screenshots/01_landing.png", ".screenshots/02_ufficio.png", ".screenshots/03_form.png", ".screenshots/04_riepilogo.png", ".screenshots/05_magazzinieri.png", ".screenshots/06_archivio.png", ".screenshots/m1_list.png", ".screenshots/m2_search.png", ".screenshots/m3_detail.png", ".screenshots/m4_sheet.png"],
+  "action_items": [
+    "Optional: add outlineStyle: 'none' to the magazzino search input style (magazzino.tsx:614) to remove the web focus ring.",
+    "Optional: when /pedane/cerca hits the 30-result cap, tell the user (e.g. 'primi 30 risultati, affina la ricerca') or raise the limit."
+  ],
+  "critical_code_review_comments": [
+    "Sheet.tsx uses the Modal slide animation. Taps during the roughly 1s slide-in can land outside the viewport. That is expected behaviour, not a bug, but automated tests must wait for the sheet to settle.",
+    "magazzino.tsx is 640 lines, close to the 700-line split threshold."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (not requested)", "frontend": "100% of requested smoke flows"},
+  "seed_data_creation": "None. No data was created, modified or unloaded. The Nuovo Ordine form was filled with TEST_X but never saved.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "SDK 58 smoke test passed. The DB has 634 active pedane in 193 orders, all statoArrivo=attesa, and 2 magazzinieri (Marc, Thiago Spago). The env var is EXPO_PUBLIC_BACKEND_URL. After opening a Sheet, wait about 1.2s before clicking its buttons. The system date is 2026-11-17."
+}

@@ -142,7 +142,7 @@ export default function Archivio() {
           ListFooterComponent={
             items.length < total ? (
               <Button label={`Carica altri (${total - items.length})`} variant="ghost" icon="chevron-down" loading={more} onPress={() => load(q, items.length)} testID="archivio-load-more-button" />
-            ) : null
+            ) : undefined
           }
           renderItem={({ item: g }) => (
             <View style={styles.card} testID={`archivio-ordine-${g.numero}`}>

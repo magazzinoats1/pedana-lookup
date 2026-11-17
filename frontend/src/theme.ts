@@ -3,7 +3,7 @@
 // The keys match the "color" block of /app/design_guidelines.json.
 
 import { useMemo } from "react";
-import { Appearance, StyleSheet, useColorScheme } from "react-native";
+import { Appearance, StyleSheet, useColorScheme, type ImageStyle, type TextStyle, type ViewStyle } from "react-native";
 
 export type ColorScheme = "light" | "dark";
 
@@ -66,8 +66,10 @@ export function useTheme(): { scheme: ColorScheme; colors: ThemeColors } {
   return { scheme, colors: themes[scheme] ?? themes.light };
 }
 
-export function makeStyles<T extends StyleSheet.NamedStyles<T> | StyleSheet.NamedStyles<any>>(
-  factory: (colors: ThemeColors) => T & StyleSheet.NamedStyles<any>,
+type NamedStyles<T> = { [P in keyof T]: ViewStyle | TextStyle | ImageStyle };
+
+export function makeStyles<T extends NamedStyles<T> | NamedStyles<any>>(
+  factory: (colors: ThemeColors) => T & NamedStyles<any>,
 ): () => T {
   return function useStyles(): T {
     const { colors } = useTheme();
