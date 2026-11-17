@@ -27,7 +27,7 @@ export default function Magazzino() {
   const [error, setError] = useState("");
   const [coop, setCoop] = useState("");
   const [filtro, setFiltro] = useState<Filtro>("attesa");
-  const [dataFiltro, setDataFiltro] = useState<DataFiltro>("tutte");
+  const [dataFiltro, setDataFiltro] = useState<DataFiltro>("oggi");
   const [scaricaOrdine, setScaricaOrdine] = useState<{ numero: string; mancanti: number } | null>(null);
   const [scaricando, setScaricando] = useState(false);
   const toast = useToast();
@@ -124,6 +124,8 @@ export default function Magazzino() {
   useEffect(() => {
     setSelectedId(null);
     setFiltro(q.trim() ? "tutte" : "attesa");
+    // Front page: only goods arriving at the warehouse TODAY; a search looks across all days
+    setDataFiltro(q.trim() ? "tutte" : "oggi");
     const t = setTimeout(() => search(q), q ? 300 : 0);
     // Live: refresh the list every 20s so new orders from the office appear by themselves
     const live = setInterval(() => {
@@ -212,7 +214,7 @@ export default function Magazzino() {
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRowContent} keyboardShouldPersistTaps="handled">
           {DATE_FILTRI.map((f) => {
             const active = dataFiltro === f.key;
-            const n = f.key === "tutte" ? results.length : results.filter((p) => dataArrivoEff(p) === isoDay(f.key === "oggi" ? 0 : 1)).length;
+            const n = totPedane(f.key === "tutte" ? results : results.filter((p) => dataArrivoEff(p) === isoDay(f.key === "oggi" ? 0 : 1)));
             return (
               <Pressable
                 key={f.key}
@@ -235,7 +237,7 @@ export default function Magazzino() {
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRowContent} keyboardShouldPersistTaps="handled">
           {FILTRI.map((f) => {
             const active = filtro === f.key;
-            const n = f.key === "tutte" ? dateFiltered.length : dateFiltered.filter((p) => p.statoArrivo === f.key).length;
+            const n = totPedane(f.key === "tutte" ? dateFiltered : dateFiltered.filter((p) => p.statoArrivo === f.key));
             const tone = f.key === "tutte" ? colors.brandPrimary : statoColor(f.key, colors);
             return (
               <Pressable
@@ -321,9 +323,9 @@ export default function Magazzino() {
                   <MaterialDesignIcons name="clock-alert-outline" size={28} color={colors.error} />
                   <View style={styles.flex}>
                     <Text style={styles.lateTitle} testID="magazzino-ritardi-count">
-                      {late.length} pedan{late.length === 1 ? "a" : "e"} in ritardo
+                      {totPedane(late)} pedan{totPedane(late) === 1 ? "a" : "e"} in ritardo
                     </Text>
-                    <Text style={styles.lateSub}>Previste per oggi e non ancora arrivate dopo le {ORA_RITARDO}:00</Text>
+                    <Text style={styles.lateSub}>{mergePositions(late).length} posizion{mergePositions(late).length === 1 ? "e" : "i"} · {totColli(late)} colli · previste per oggi e non ancora arrivate dopo le {ORA_RITARDO}:00</Text>
                   </View>
                 </View>
               );
@@ -333,20 +335,22 @@ export default function Magazzino() {
                 <MaterialDesignIcons name="truck-alert-outline" size={28} color={colors.brandSecondary} />
                 <View style={styles.flex}>
                   <Text style={styles.daTitle} testID="magazzino-da-scaricare-count">
-                    {filtered.length} pedan{filtered.length === 1 ? "a" : "e"} da scaricare
+                    {totPedane(filtered)} pedan{totPedane(filtered) === 1 ? "a" : "e"} da scaricare
                   </Text>
-                  <Text style={styles.daSub}>Non ancora arrivate in magazzino · {groupByOrder(filtered).length} ordini</Text>
+                  <Text style={styles.daSub}>
+                    {dataFiltro === "oggi" ? "Arrivano oggi in magazzino Antolini" : dataFiltro === "domani" ? "Arrivano domani in magazzino Antolini" : "Non ancora arrivate in magazzino"} · {groupByOrder(filtered).length} ordini · {mergePositions(filtered).length} posizioni · {totColli(filtered)} colli
+                  </Text>
                 </View>
               </View>
             )}
             <Text style={styles.count} testID="magazzino-results-count">
-              {q.trim() ? `${filtered.length} pedane trovate` : filtro === "tutte" && dataFiltro === "tutte" ? `Tutta la merce registrata · ${filtered.length} pedane` : `${filtered.length} pedane`} · {groupByOrder(filtered).length} ordini
+              {q.trim() ? `${totPedane(filtered)} pedane trovate` : filtro === "tutte" && dataFiltro === "tutte" ? `Tutta la merce registrata · ${totPedane(filtered)} pedane` : `${totPedane(filtered)} pedane · ${mergePositions(filtered).length} posizioni`} · {groupByOrder(filtered).length} ordini
             </Text>
             {groupByOrder(filtered).map((g, gi) => {
               const all = results.filter((p) => (p.numeroOrdine || "—") === g.numero);
               const done = all.filter((p) => p.statoArrivo === "completo").length;
               const colli = g.items.reduce((n, p) => n + (parseInt(p.numeroColli, 10) || 0), 0);
-              const pal = g.items.reduce((n, p) => n + (parseInt(p.numeroPedane ?? "", 10) || 0), 0);
+              const pal = totPedane(g.items);
               const complete = done === all.length;
               return (
                 <Animated.View key={g.numero} entering={FadeInDown.delay(Math.min(gi, 6) * 40).duration(200)} style={styles.group} testID={`magazzino-group-${g.numero}`}>
@@ -532,6 +536,10 @@ function groupByOrder(list: Pedana[]) {
 }
 
 const STATO_LABEL = { attesa: "In attesa", parziale: "Parziale", completo: "Scaricato" } as const;
+
+// Real pallet / colli counts from the PDF "Pedane" and "KO" columns (rows sharing a pallet have 0; manual rows without a value count 1)
+const totPedane = (list: Pedana[]) => list.reduce((n, p) => n + (p.numeroPedane?.trim() ? parseInt(p.numeroPedane, 10) || 0 : 1), 0);
+const totColli = (list: Pedana[]) => list.reduce((n, p) => n + (parseInt(p.numeroColli, 10) || 0), 0);
 
 const useStyles = makeStyles((c) => ({
   chipWrap: { height: 52, flexShrink: 0, justifyContent: "center", backgroundColor: c.surfaceSecondary },

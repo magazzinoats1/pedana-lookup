@@ -241,14 +241,16 @@ async function caricaArrivi() {
     const list = await call("/riepilogo?data=" + document.getElementById("giorno").value);
     const ordini = {};
     list.forEach(p => (ordini[p.numeroOrdine] = ordini[p.numeroOrdine] || []).push(p));
-    const tot = list.length, fatte = list.filter(p => p.statoArrivo === "completo").length;
-    const parz = list.filter(p => p.statoArrivo === "parziale").length;
+    const ped = l => l.reduce((n, p) => n + ((p.numeroPedane || "").trim() ? parseInt(p.numeroPedane, 10) || 0 : 1), 0);
+    const colli = l => l.reduce((n, p) => n + (parseInt(p.numeroColli, 10) || 0), 0);
+    const tot = ped(list), fatte = ped(list.filter(p => p.statoArrivo === "completo"));
+    const parz = ped(list.filter(p => p.statoArrivo === "parziale"));
     document.getElementById("riepilogo").innerHTML =
-      `<span class="badge b-attesa">${tot} pedane</span><span class="badge b-completo">${fatte} scaricate</span><span class="badge b-parziale">${parz} parziali</span><span class="badge b-attesa">${tot - fatte - parz} da scaricare</span>`;
+      `<span class="badge b-attesa">${tot} pedane · ${colli(list)} colli</span><span class="badge b-completo">${fatte} scaricate</span><span class="badge b-parziale">${parz} parziali</span><span class="badge b-attesa">${tot - fatte - parz} da scaricare</span>`;
     document.getElementById("arrivi").innerHTML = Object.keys(ordini).length ? Object.entries(ordini).map(([num, ps]) => `
       <div class="ord"><h3>Ordine ${esc(num)} <span class="muted">· ${esc(ps[0].trasportatore)} · consegna ${itDate(ps[0].dataConsegna)}</span></h3>
-      <table><thead><tr><th>Posizione</th><th>Fornitore</th><th>Merce</th><th>Destinazione</th><th>Stato</th><th>Magazziniere</th></tr></thead><tbody>
-      ${ps.map(p => `<tr><td><b>${esc(p.codice)}</b></td><td>${esc(p.mittente)}</td><td>${esc(p.merce)}</td><td>${esc(p.destinazione)}</td>
+      <table><thead><tr><th>Posizione</th><th>Fornitore</th><th>Merce</th><th>Destinazione</th><th>Pedane</th><th>Colli</th><th>Stato</th><th>Magazziniere</th></tr></thead><tbody>
+      ${ps.map(p => `<tr><td><b>${esc(p.codice)}</b></td><td>${esc(p.mittente)}</td><td>${esc(p.merce)}</td><td>${esc(p.destinazione)}</td><td>${esc(p.numeroPedane)}</td><td>${esc(p.numeroColli)}</td>
         <td><span class="badge b-${p.statoArrivo}">${STATI[p.statoArrivo] || p.statoArrivo}</span></td>
         <td>${esc(p.arrivoCompletoDa || p.arrivoParzialeDa || "")}</td></tr>`).join("")}
       </tbody></table></div>`).join("") : '<p class="muted">Nessuna pedana in arrivo in questo giorno.</p>';

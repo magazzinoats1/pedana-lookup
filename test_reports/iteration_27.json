@@ -1,0 +1,35 @@
+{
+  "summary": "Frontend-only test of the Magazzino 'today only' front page (390x844) and the /api/sito Arrivi tab. Server and browser date: 2026-11-17 15:25 UTC. All requested flows PASS. On open, the 'Oggi' date chip and the 'Da scaricare' status chip are active, and the list holds only today's 3 orders (25024256, 25024264, 25024265; 15 rows). magazzino-ritardi-count shows '27 pedane in ritardo' and the sub text '9 posizioni · 2164 colli'. magazzino-da-scaricare-count shows '27 pedane da scaricare' with '3 ordini · 9 posizioni · 2164 colli'. These match a sum computed independently from GET /api/pedane/tutte: 27 pallets (rows with numeroPedane '0' count 0), 9 positions and 2164 colli. Pallet sums are also shown on the date chips (Tutte 1254, Oggi 27, Domani 38) and the status chips. Typing a search switches the date chip to Tutte, and clearing the search returns to Oggi with 27 again. Tapping the Tutte date chip shows all days (1254 pedane, 194 orders); the ritardi banner still counts only today. Domani shows 38. On the office site, Arrivi defaults to today and the badges read '27 pedane · 2164 colli / 0 scaricate / 0 parziali / 27 da scaricare'. The table has Pedane and Colli columns with the PDF values, and switching to 2026-11-18 shows 38 pedane · 4000 colli. Found only minor consistency and design issues.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Search results count", "issue": "During a search the text uses filtered.length (rows), while the chips show pallet sums. Searching '25024265' shows '9 pedane trovate', but the Oggi chip and the group summary say 13 pedane. Reference: /app/frontend/app/magazzino.tsx:347", "testID": "magazzino-results-count", "priority": "LOW"},
+      {"component": "Group progress pill", "issue": "done/all counts rows, not pallets. Order 25024256 shows '0/3' next to '9 pedane', and order 25024265 shows '0/9' next to '13 pedane'. Reference: magazzino.tsx:350-354,373", "testID": "magazzino-group-progress-<numero>", "priority": "LOW"},
+      {"component": "Group summary pallet count", "issue": "The group 'pal' uses parseInt(numeroPedane)||0, so empty numeroPedane counts 0 and the 'N pedane' part is hidden, while totPedane counts an empty value as 1. Old orders such as 25023482 show no pedane in the group header but add 1 each to the banner and chip totals. Reference: magazzino.tsx:353 vs 541", "testID": "magazzino-group-summary-<numero>", "priority": "LOW"},
+      {"component": "Back link", "issue": "'Torna ai 3 risultati' uses results.length (rows) even though the search matched a single position. Reference: magazzino.tsx:311", "testID": "magazzino-back-to-results-button", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Magazzino", "issues": ["Date and status filter chips are 36px high, under the 44px minimum touch target (styles.chip height 36). The operatore pill is 40px high."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/tmp/expected.py (ad-hoc expected-value calculator from /api/pedane/tutte)"],
+  "action_items": [
+    "magazzino.tsx:347: use totPedane(filtered) for the search results count, or label it as rows/merci.",
+    "magazzino.tsx:353: use totPedane(g.items) for the group 'pal' so it matches the banners and chips.",
+    "Optional: make the group progress pill count pallets (e.g. totPedane done / totPedane all), and raise the chip height to 44."
+  ],
+  "critical_code_review_comments": [
+    "isoDay() is computed from device local time on each render. The 20s live refresh re-renders, so the day rolls over at midnight. OK.",
+    "The search effect resets dataFiltro on each q change, so a date chip the user picked during a search is lost after any further keystroke. This is acceptable per the spec.",
+    "The ritardi banner uses dateFiltered, so when Domani is selected the banner is hidden even if pallets are late today. This is acceptable, because the default view is Oggi."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend only)", "frontend": "100% of requested flows (4 minor consistency bugs, 1 design issue)"},
+  "seed_data_creation": "None. Read-only test; no data was created or changed.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "The server date is 2026-11-17 UTC. Today has 15 rows = 27 pallets, 9 positions, 2164 colli, 3 orders, all in 'attesa' and late after 14:00. Tomorrow has 38 pallets / 4000 colli; all days have 1254 pallets. Office password: antolini2024.",
+  "rca_of_issue": ""
+}

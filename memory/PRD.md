@@ -53,3 +53,6 @@ User uploaded a KÖLLA transport-order PDF and a reference web app (GestioneLogi
 ## Update: Sito Ufficio (browser)
 - GET /api/sito serves /app/backend/sito.html: office login, PDF drag&drop import, editable rows, save with overwrite confirm, "Arrivi in magazzino" tab auto-refresh 15s (stato + magazziniere). Production URL: https://pedana-lookup.emergent.host/api/sito
 - Expo SDK upgraded to 58 (RN 0.88).
+
+## Update: Magazzino front page only today
+- Default date filter "Oggi" (search switches to Tutte, clearing returns to Oggi). Banners/chips/counts use real pallet sums (numeroPedane; empty=1, 0=0) + colli sums. Sito Arrivi shows pedane+colli.
