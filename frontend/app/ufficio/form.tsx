@@ -185,7 +185,7 @@ export default function OrdineFormScreen() {
     return { e, iso };
   }
 
-  async function doSave() {
+  async function doSave(sovrascrivi = false) {
     const iso = itToIso(data)!;
     const payloadForm: OrdineForm = { ...form, mittente: "", dataConsegna: iso };
     setSaving(true);
@@ -194,8 +194,8 @@ export default function OrdineFormScreen() {
         await api(`/pedane/${editingId}`, { method: "PUT", body: { form: payloadForm, pedana: toApiRow(rows[0]) } });
         toast("Ordine modificato");
       } else {
-        const created = await api<Pedana[]>("/pedane", { method: "POST", body: { form: payloadForm, pedane: rows.map(toApiRow) } });
-        toast(created.length > 1 ? `${created.length} pedane registrate` : "Ordine registrato");
+        const created = await api<Pedana[]>("/pedane", { method: "POST", body: { form: payloadForm, pedane: rows.map(toApiRow), sovrascrivi } });
+        toast(sovrascrivi ? "Ordine sovrascritto" : created.length > 1 ? `${created.length} pedane registrate` : "Ordine registrato");
       }
       setDup(null);
       if (router.canGoBack()) router.back();
@@ -370,7 +370,7 @@ export default function OrdineFormScreen() {
                 <Field label="Tipo merce" value={r.merce} onChangeText={(t) => setRow(i, "merce", t)} placeholder="es. Uva rossa senza semi, Radicchio…" testID={`form-pedana-merce-input-${i}`} />
                 <View style={styles.twoCol}>
                   <View style={styles.flex2}>
-                    <Field label="Arrivo in magazzino" value={r.dataArrivo} onChangeText={(t) => setRow(i, "dataArrivo", t)} placeholder="GG/MM/AAAA" keyboardType="numbers-and-punctuation" error={re?.dataArrivo} hint="Giorno dopo la partenza dal fornitore" testID={`form-pedana-data-arrivo-input-${i}`} />
+                    <Field label="Arrivo in magazzino" value={r.dataArrivo} onChangeText={(t) => setRow(i, "dataArrivo", t)} placeholder="GG/MM/AAAA" keyboardType="numbers-and-punctuation" error={re?.dataArrivo} hint="Quando la merce arriva al magazzino Antolini" testID={`form-pedana-data-arrivo-input-${i}`} />
                   </View>
                   <View style={styles.flex}>
                     <Field label="Ora" value={r.oraArrivo} onChangeText={(t) => setRow(i, "oraArrivo", t)} placeholder="HH:MM" keyboardType="numbers-and-punctuation" error={re?.oraArrivo} testID={`form-pedana-ora-arrivo-input-${i}`} />
@@ -410,12 +410,12 @@ export default function OrdineFormScreen() {
                   ? dup.codiceMatches.length === 1
                     ? "Posizione già registrata!"
                     : `${dup.codiceMatches.length} posizioni già registrate!`
-                  : "Ordine già registrato"}
+                  : "Ordine già esistente!"}
               </Text>
               <Text style={styles.dupSub}>
                 {dup.codiceMatches.length
                   ? "Queste posizioni sono già assegnate ad altri ordini:"
-                  : `Il numero ordine "${form.numeroOrdine}" ha già ${dup.numeroMatches.length} pedan${dup.numeroMatches.length === 1 ? "a" : "e"}. Se è una nuova pedana dello stesso ordine, conferma.`}
+                  : `L'ordine "${form.numeroOrdine}" è già registrato con ${dup.numeroMatches.length} pedan${dup.numeroMatches.length === 1 ? "a" : "e"}. Sovrascrivendo, il vecchio ordine verrà eliminato e sostituito da questo${dup.numeroMatches.some((m) => m.statoArrivo !== "attesa") ? " (anche le pedane già scaricate)" : ""}.`}
               </Text>
             </View>
             {(dup.codiceMatches.length ? dup.codiceMatches.map((m) => m.match) : dup.numeroMatches).map((m) => (
@@ -438,11 +438,11 @@ export default function OrdineFormScreen() {
             ))}
             <View style={styles.dupBtns}>
               <Button
-                label={dup.codiceMatches.length ? "Registra comunque" : "Conferma nuova pedana"}
-                variant={dup.codiceMatches.length ? "warning" : "success"}
-                icon="check"
+                label={dup.codiceMatches.length ? "Registra comunque" : "Sovrascrivi ordine"}
+                variant="warning"
+                icon={dup.codiceMatches.length ? "check" : "file-replace-outline"}
                 loading={saving}
-                onPress={doSave}
+                onPress={() => doSave(!dup.codiceMatches.length && dup.numeroMatches.length > 0)}
                 testID="form-dup-confirm-button"
               />
               <Button label="Annulla, correggo" variant="secondary" onPress={() => setDup(null)} testID="form-dup-cancel-button" />

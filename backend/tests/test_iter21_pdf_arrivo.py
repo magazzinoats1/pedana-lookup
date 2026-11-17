@@ -37,12 +37,10 @@ def test_import_old_pdf(auth_headers):
     d = _import(PDF_URL, auth_headers)
     print(d)
     assert d["dataConsegna"] == "2026-10-14"
+    # Iter24: all rows loaded 2026-10-13; Bertoli/Morando are loaded in Verona area/Antolini -> same day (2026-10-13)
     for p in d["pedane"]:
         assert p["oraArrivo"] == ""
-        if "ORCHIDEA" in p["mittente"].upper():
-            assert p["dataArrivo"] == "2026-10-13", p
-        else:
-            assert p["dataArrivo"] == "2026-10-14", p
+        assert p["dataArrivo"] == "2026-10-13", p
 
 
 def _body(num, **row):

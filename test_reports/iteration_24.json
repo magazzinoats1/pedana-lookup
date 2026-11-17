@@ -1,0 +1,34 @@
+{
+  "summary": "Tested order overwrite (sovrascrivi) and the PDF import arrival-date rule. Backend: 14/14 pytest pass. These cover overwrite replacing the old pedane (old ids return 404), append without sovrascrivi, case-insensitive overwrite that leaves other orders untouched, an invalid payload (422) that does not delete the old order, auth required, and the new KÖLLA PDF (9 pedane, all dataArrivo 2026-11-17, dataConsegna 2026-11-19, destinazione 'Josef Ochs GmbH - St Ingbert'). The old PDF regression passes with the updated expectation (all rows 2026-10-13). Frontend (390x844): Ufficio login, then Nuovo Ordine TEST_SOVR_UI/TEST-A shows the 'Ordine registrato' toast. Creating it again with TEST-B opens form-dup-sheet with 'Ordine già esistente!', the old pedana TEST-A listed and the 'Sovrascrivi ordine' button. Pressing it shows the 'Ordine sovrascritto' toast and returns to /ufficio. The backend duplicati check shows only TEST-B. All TEST data was deleted by id and the DB is back to 634 pedane.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/import-pdf (AI fallback path)", "issue": "server.py:768: for non-KÖLLA PDFs the AI fallback always sets dataArrivo = dataCarico + 1. It ignores the new local rule (Antolini/Verona loading = same day) that only parse_ordine_pdf applies (line 704)."},
+      {"endpoint": "POST /api/pedane (sovrascrivi)", "issue": "server.py:439: delete_many runs before the inserts and nothing makes the two steps atomic. If an insert fails partway, the old order is lost. The overwrite also deletes pedane in any state (e.g. already scaricata), and the sheet does not warn about this."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "ufficio/form", "issues": ["form.tsx:373: the 'Arrivo in magazzino' hint 'Giorno dopo la partenza dal fornitore' is now inaccurate for Antolini/Verona-area loading, which arrives the same day."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_iter24_sovrascrivi_pdf.py", "/app/backend/tests/test_iter21_pdf_arrivo.py", "/app/test_reports/pytest/pytest_iter24.xml", ".screenshots/dup_sheet.png", ".screenshots/after_overwrite.png"],
+  "action_items": [
+    "Optional: apply the RX_LOCALE same-day rule in the AI fallback of import_pdf too (the AI prompt would need to return the loading place).",
+    "Optional: update the form.tsx:373 hint text to reflect the same-day rule for local suppliers.",
+    "Optional: consider warning in the overwrite sheet if any old pedana is already scaricata/archiviata."
+  ],
+  "critical_code_review_comments": [
+    "server.py is 871 lines, above the 700-line guideline. Consider splitting the PDF parsing into its own module.",
+    "form.tsx handleSave sends codici: [], so codiceMatches is always empty. The 'Registra comunque' branch of the sheet is effectively dead for new orders."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter21_pdf_arrivo.py (old PDF expectation: all rows now 2026-10-13)", "/app/backend/tests/test_iter24_sovrascrivi_pdf.py (new)"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "TEST_SOVR_API_<ts> and TEST_SOVR_UI orders were created and deleted by id. The DB is back to 634 pedane. No real data was changed.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Run the tests from /app/backend/tests (conftest provides BASE_URL and auth_headers). test_operatore.py is outdated (pre-PIN), ignore it. Office login sheet: wait about 1s before clicking ufficio-login-button. The DB has 634 real pedane: read-only."
+}

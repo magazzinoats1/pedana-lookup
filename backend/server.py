@@ -133,6 +133,7 @@ class PedanaIn(BaseModel):
 class CreateReq(BaseModel):
     form: OrdineForm
     pedane: List[PedanaIn]
+    sovrascrivi: bool = False
 
 
 class UpdateReq(BaseModel):
@@ -442,8 +443,12 @@ async def create_pedane(body: CreateReq, _=Depends(require_ufficio)):
             numeroColli=p.numeroColli.strip(), numeroPedane=p.numeroPedane.strip(), merce=p.merce.strip(),
             dataArrivo=p.dataArrivo.strip(), oraArrivo=p.oraArrivo.strip(),
         )
-        await db.pedane.insert_one(item.to_mongo())
         created.append(item)
+    await db.pedane.insert_many([c.to_mongo() for c in created])
+    if body.sovrascrivi and f.numeroOrdine.strip():
+        # Re-registered order replaces the old one: remove old pedane only after the new ones are saved
+        await db.pedane.delete_many({"numeroOrdine": {"$regex": f"^{re.escape(f.numeroOrdine.strip())}$", "$options": "i"},
+                                     "id": {"$nin": [c.id for c in created]}})
     return created
 
 
@@ -599,6 +604,7 @@ RX_DATE = re.compile(r"^(\d{2})\.(\d{2})\.(\d{4})$")
 RX_TIME = re.compile(r"^\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2}$")
 RX_LONG = re.compile(r"^A?\d{4}-\d{6}-\d+$")
 RX_SHORT = re.compile(r"^\d{4}-\d{6}$")
+RX_LOCALE = re.compile(r"antolini|\[VR\]|\(VR\)|\bverona\b", re.I)
 MERCE_SKIP = re.compile(r"\d|rinfusa|^cl\.|collo|cartone|epal|polistirolo|lux|extra|cestino|plastica|flowpack", re.I)
 
 
@@ -694,8 +700,10 @@ def parse_ordine_pdf(path: str) -> Optional[dict]:
             "destinazione": f"{nome} - {citta}" if citta else nome,
             "numeroColli": r["colli"], "numeroPedane": r["pedane"],
             "mittente": r["mittente"], "merce": r["merce"],
-            # Goods leave the supplier on the loading date and reach the Antolini warehouse the next day
-            "dataArrivo": giorno_dopo(r["data"]), "oraArrivo": "",
+            # Far suppliers: picked up on the loading date, at the Antolini warehouse the next day.
+            # Loaded at Antolini itself or in the Verona area: arrives the same day.
+            "dataArrivo": r["data"] if RX_LOCALE.search(r["place"]) else giorno_dopo(r["data"]),
+            "oraArrivo": "",
         })
     return {
         "numeroOrdine": m.group(1), "agenzia": ag.group(1).strip() if ag else "",
