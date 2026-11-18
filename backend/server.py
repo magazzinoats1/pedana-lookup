@@ -856,6 +856,12 @@ async def sito():
     return HTMLResponse(SITO_HTML.read_text(encoding="utf-8"))
 
 
+@api.get("/privacy", response_class=HTMLResponse, include_in_schema=False)
+async def privacy():
+    # Public privacy policy page (required by App Store / Google Play)
+    return HTMLResponse((ROOT_DIR / "privacy.html").read_text(encoding="utf-8"))
+
+
 app.include_router(api)
 app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 

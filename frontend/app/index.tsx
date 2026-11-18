@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Linking, Pressable, Text, View } from "react-native";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import Animated, { FadeIn, FadeInDown, FadeOut, ZoomIn } from "react-native-reanimated";
@@ -119,6 +119,14 @@ export default function Accesso() {
             <MaterialDesignIcons name="arrow-right" size={24} color={colors.onBrand} />
           </Pressable>
         </Animated.View>
+        <Pressable
+          testID="accesso-privacy-link"
+          onPress={() => Linking.openURL(`${process.env.EXPO_PUBLIC_BACKEND_URL}/api/privacy`)}
+          hitSlop={12}
+          style={styles.privacy}
+        >
+          <Text style={styles.privacyText}>Informativa privacy</Text>
+        </Pressable>
       </View>
 
       <Sheet visible={showPass} onClose={() => setShowPass(false)} testID="ufficio-password-sheet">
@@ -174,6 +182,8 @@ const useStyles = makeStyles((c) => ({
     gap: 14,
   },
   pressed: { opacity: 0.85, transform: [{ scale: 0.98 }] },
+  privacy: { alignSelf: "center", minHeight: 44, justifyContent: "center", paddingHorizontal: 12 },
+  privacyText: { fontFamily: fonts.textMedium, fontSize: 13, color: c.muted, textDecorationLine: "underline" },
   roleIconWhite: { width: 52, height: 52, borderRadius: 12, backgroundColor: c.brandTertiary, alignItems: "center", justifyContent: "center" },
   roleIconGlass: { width: 52, height: 52, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.14)", alignItems: "center", justifyContent: "center" },
   roleTitleDark: { fontFamily: fonts.textBold, fontSize: 17, color: c.brandPrimary },
