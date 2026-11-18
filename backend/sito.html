@@ -46,6 +46,7 @@
   <button id="logoutBtn" class="hidden" onclick="logout()">Esci</button>
 </header>
 <main>
+  <div id="previewWarn" class="msg err" style="display:none;font-weight:700">⚠️ ANTEPRIMA DI PROVA: gli ordini registrati qui NON arrivano all'app dei magazzinieri. Usa https://pedana-lookup.emergent.host/api/sito</div>
   <div id="msg" class="msg"></div>
 
   <section id="loginView" class="card" style="max-width:420px;margin:60px auto">
@@ -259,6 +260,7 @@ async function caricaArrivi() {
   } catch (err) { show(err.message); }
 }
 
+if (location.hostname.includes("preview")) document.getElementById("previewWarn").style.display = "block";
 if (token) enter();
 </script>
 </body>
