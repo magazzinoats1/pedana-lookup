@@ -56,3 +56,4 @@ User uploaded a KÖLLA transport-order PDF and a reference web app (GestioneLogi
 
 ## Update: Magazzino front page only today
 - Default date filter "Oggi" (search switches to Tutte, clearing returns to Oggi). Banners/chips/counts use real pallet sums (numeroPedane; empty=1, 0=0) + colli sums. Sito Arrivi shows pedane+colli.
+- Sito: aggiunto Accesso Magazzino (nome+PIN): ricerca, filtri Oggi/Domani/Tutte + stato, ritardi, scarico posizione/parziale/annulla, scarica ordine intero, auto-refresh 15s. /api/privacy pagina informativa + link in app.

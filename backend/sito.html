@@ -36,27 +36,69 @@
   .b-attesa { background:#eef0f4; color:var(--muted); } .b-parziale { background:#fff3dc; color:var(--warn); } .b-completo { background:#e3f5ea; color:var(--ok); }
   .ord { margin-top:16px; } .ord h3 { margin:0 0 6px; font-size:16px; }
   .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+  .pos { border:2px solid var(--line); border-radius:12px; padding:12px 14px; margin-top:10px; background:#fff; }
+  .pos.late { border-color:var(--red); background:#fff5f5; }
+  .pos.done { opacity:.7; }
+  .pos .cod { font-size:22px; font-weight:800; color:var(--brand); }
+  .acts { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+  .acts button { min-height:44px; }
+  button.warn { background:var(--warn); }
+  button.del { background:var(--red); }
+  .banner { border-radius:12px; padding:14px 18px; margin-bottom:12px; font-weight:700; }
+  .banner.red { background:var(--red); color:#fff; }
+  .banner.blue { background:var(--brand); color:#fff; }
   .hidden { display:none !important; }
   .muted { color:var(--muted); font-size:13px; }
 </style>
 </head>
 <body>
 <header>
-  <h1>Antolini Trasporti · Registrazione Ordini</h1>
-  <button id="logoutBtn" class="hidden" onclick="logout()">Esci</button>
+  <h1>Antolini Trasporti · Gestione Pedane</h1>
+  <button id="logoutBtn" class="hidden" onclick="token ? logout() : logoutMag()">Esci</button>
 </header>
 <main>
   <div id="previewWarn" class="msg err" style="display:none;font-weight:700">⚠️ ANTEPRIMA DI PROVA: gli ordini registrati qui NON arrivano all'app dei magazzinieri. Usa https://pedana-lookup.emergent.host/api/sito</div>
   <div id="msg" class="msg"></div>
 
-  <section id="loginView" class="card" style="max-width:420px;margin:60px auto">
+  <section id="loginView" style="max-width:860px;margin:40px auto">
+   <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px">
+    <div class="card">
     <h2 style="margin-top:0">Accesso Ufficio</h2>
+    <p class="muted">Registrazione ordini da PDF e arrivi</p>
     <form onsubmit="login(event)">
       <label>Password</label>
       <input id="pw" type="password" autocomplete="current-password" required>
       <div style="height:12px"></div>
       <button type="submit" id="loginBtn">Entra</button>
     </form>
+    </div>
+    <div class="card">
+    <h2 style="margin-top:0">Accesso Magazzino</h2>
+    <p class="muted">Ricerca pedane e scarico merce</p>
+    <form onsubmit="loginMag(event)">
+      <label>Magazziniere</label>
+      <select id="magNome" required style="font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;width:100%"></select>
+      <div style="height:10px"></div>
+      <label>PIN</label>
+      <input id="magPin" type="password" inputmode="numeric" maxlength="6" required>
+      <div style="height:12px"></div>
+      <button type="submit" id="magLoginBtn">Entra in Magazzino</button>
+    </form>
+    </div>
+   </div>
+  </section>
+
+  <section id="magView" class="hidden">
+    <div class="card" style="padding:14px">
+      <div class="row">
+        <b id="magChi" style="flex:1"></b>
+        <span class="muted" id="magAgg"></span>
+      </div>
+      <input id="magQ" placeholder="Cerca posizione o numero ordine (anche parziale)" style="margin-top:10px;font-size:18px;padding:12px" oninput="magCercaDebounce()">
+      <div class="tabs" style="margin:10px 0 0;flex-wrap:wrap" id="magFiltri"></div>
+    </div>
+    <div id="magBanner"></div>
+    <div id="magLista"></div>
   </section>
 
   <section id="appView" class="hidden">
@@ -260,8 +302,154 @@ async function caricaArrivi() {
   } catch (err) { show(err.message); }
 }
 
+// ── Magazzino ──
+let magToken = sessionStorage.getItem("magToken");
+let magNomeCur = sessionStorage.getItem("magNomeCur") || "";
+let magData = [], magDate = "oggi", magStato = "attesa", magTimer = null, magDeb = null;
+const ORA_RITARDO = 14;
+
+async function callMag(path, opts = {}) {
+  const headers = { "Content-Type": "application/json" };
+  if (magToken) headers.Authorization = "Bearer " + magToken;
+  const r = await fetch(API + path, { ...opts, headers, body: opts.json ? JSON.stringify(opts.json) : undefined });
+  const data = await r.json().catch(() => ({}));
+  if (r.status === 401 && magToken) { logoutMag(); throw new Error("Sessione scaduta: accedi di nuovo con nome e PIN"); }
+  if (!r.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Operazione non riuscita");
+  return data;
+}
+async function caricaNomi() {
+  try {
+    const nomi = await (await fetch(API + "/magazzinieri/nomi")).json();
+    document.getElementById("magNome").innerHTML = '<option value="">Scegli il tuo nome…</option>' + nomi.map(n => `<option value="${esc(n.id)}">${esc(n.nome)}</option>`).join("");
+  } catch {}
+}
+async function loginMag(e) {
+  e.preventDefault();
+  const btn = document.getElementById("magLoginBtn"); btn.disabled = true;
+  try {
+    magToken = null;
+    const d = await callMag("/auth/magazzino/login", { method: "POST", json: { id: document.getElementById("magNome").value, pin: document.getElementById("magPin").value } });
+    magToken = d.token; magNomeCur = d.nome;
+    sessionStorage.setItem("magToken", magToken); sessionStorage.setItem("magNomeCur", magNomeCur);
+    document.getElementById("magPin").value = "";
+    enterMag();
+  } catch (err) { show(err.message); }
+  btn.disabled = false;
+}
+function logoutMag() {
+  if (magToken) fetch(API + "/auth/magazzino/logout", { method: "POST", headers: { Authorization: "Bearer " + magToken } }).catch(() => {});
+  magToken = null; sessionStorage.removeItem("magToken"); sessionStorage.removeItem("magNomeCur"); clearInterval(magTimer);
+  document.getElementById("magView").classList.add("hidden");
+  document.getElementById("loginView").classList.remove("hidden");
+  document.getElementById("logoutBtn").classList.add("hidden");
+}
+function enterMag() {
+  clearMsg();
+  document.getElementById("loginView").classList.add("hidden");
+  document.getElementById("magView").classList.remove("hidden");
+  document.getElementById("logoutBtn").classList.remove("hidden");
+  document.getElementById("magChi").textContent = "👷 " + magNomeCur;
+  magCarica();
+  clearInterval(magTimer); magTimer = setInterval(magCarica, 15000);
+}
+function magCercaDebounce() { clearTimeout(magDeb); magDeb = setTimeout(() => {
+  const q = document.getElementById("magQ").value.trim();
+  magDate = q ? "tutte" : "oggi"; magStato = q ? "tutte" : "attesa";
+  magCarica();
+}, 350); }
+let magSeq = 0;
+async function magCarica() {
+  const q = document.getElementById("magQ").value.trim();
+  const seq = ++magSeq;
+  try {
+    const data = await callMag(q ? "/pedane/cerca?q=" + encodeURIComponent(q) : "/pedane/tutte");
+    // Ignore responses that arrive after a newer search (avoids acting on a stale list)
+    if (seq !== magSeq) return;
+    magData = data;
+    magRender();
+    if (document.getElementById("msg").classList.contains("err")) clearMsg();
+    document.getElementById("magAgg").textContent = "Aggiornato alle " + new Date().toLocaleTimeString("it-IT");
+  } catch (err) { show(err.message); }
+}
+const arrivo = p => p.dataArrivo || p.dataConsegna;
+const giornoISO = add => { const d = new Date(); d.setDate(d.getDate() + add); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
+const pedN = p => (p.numeroPedane || "").trim() ? parseInt(p.numeroPedane, 10) || 0 : 1;
+const sumPed = l => l.reduce((n, p) => n + pedN(p), 0);
+const sumColli = l => l.reduce((n, p) => n + (parseInt(p.numeroColli, 10) || 0), 0);
+function late(p) {
+  if (p.statoArrivo !== "attesa" || arrivo(p) !== giornoISO(0)) return false;
+  const m = /^(\d{1,2}):(\d{2})$/.exec(p.oraArrivo || "");
+  const soglia = Math.max(ORA_RITARDO * 60, m ? +m[1] * 60 + +m[2] : 0);
+  const n = new Date(); return n.getHours() * 60 + n.getMinutes() >= soglia;
+}
+// Same position in the same order = one stop for the worker
+function posizioni(list) {
+  const map = new Map();
+  list.forEach(p => { const k = p.numeroOrdine + "|" + p.codice.toUpperCase(); (map.get(k) || map.set(k, []).get(k)).push(p); });
+  return [...map.values()];
+}
+function magSet(kind, v) { if (kind === "d") magDate = v; else magStato = v; magRender(); }
+function magRender() {
+  const byDate = magDate === "tutte" ? magData : magData.filter(p => arrivo(p) === giornoISO(magDate === "oggi" ? 0 : 1));
+  const list = magStato === "tutte" ? byDate : byDate.filter(p => p.statoArrivo === magStato);
+  const btn = (kind, v, label, active, n) => `<button class="${active ? "active" : ""}" onclick="magSet('${kind}','${v}')">${label} · ${n}</button>`;
+  const dCount = v => sumPed(v === "tutte" ? magData : magData.filter(p => arrivo(p) === giornoISO(v === "oggi" ? 0 : 1)));
+  const sCount = v => sumPed(v === "tutte" ? byDate : byDate.filter(p => p.statoArrivo === v));
+  document.getElementById("magFiltri").innerHTML =
+    [["oggi", "Oggi"], ["domani", "Domani"], ["tutte", "Tutte le date"]].map(([v, l]) => btn("d", v, l, magDate === v, dCount(v))).join("")
+    + '<span style="width:12px"></span>'
+    + [["attesa", "Da scaricare"], ["parziale", "Parziali"], ["completo", "Scaricate"], ["tutte", "Tutte"]].map(([v, l]) => btn("s", v, l, magStato === v, sCount(v))).join("");
+  const lateList = byDate.filter(late);
+  document.getElementById("magBanner").innerHTML =
+    (lateList.length ? `<div class="banner red">⚠️ ${sumPed(lateList)} pedane in ritardo · previste per oggi e non ancora arrivate dopo le ${ORA_RITARDO}:00</div>` : "")
+    + (magStato === "attesa" && list.length ? `<div class="banner blue">${sumPed(list)} pedane da scaricare · ${posizioni(list).length} posizioni · ${sumColli(list)} colli${magDate === "oggi" ? " · arrivano oggi in magazzino Antolini" : ""}</div>` : "");
+  const ordini = {};
+  list.forEach(p => (ordini[p.numeroOrdine] = ordini[p.numeroOrdine] || []).push(p));
+  const STATO = { attesa: "Da scaricare", parziale: "Parziale", completo: "Scaricata" };
+  document.getElementById("magLista").innerHTML = Object.keys(ordini).length ? Object.entries(ordini).map(([num, ps]) => {
+    const daFare = ps.some(p => p.statoArrivo !== "completo");
+    return `<div class="card" style="padding:14px">
+      <div class="row"><h3 style="margin:0;flex:1">Ordine ${esc(num)} <span class="muted">· ${esc(ps[0].trasportatore || "")} · arrivo ${itDate(arrivo(ps[0]))} · ${sumPed(ps)} pedane</span></h3>
+      ${daFare ? `<button class="ok" onclick="magScaricaOrdine('${esc(num)}')">Scarica ordine intero</button>` : ""}</div>
+      ${posizioni(ps).map(items => {
+        const p = items[0], st = p.statoArrivo || "attesa";
+        const chi = st === "completo" ? p.arrivoCompletoDa : st === "parziale" ? p.arrivoParzialeDa : "";
+        return `<div class="pos ${late(p) ? "late" : ""} ${st === "completo" ? "done" : ""}">
+          <div class="row"><span class="cod">${esc(p.codice)}</span><span class="badge b-${st}">${STATO[st]}${chi ? " · " + esc(chi) : ""}</span>${late(p) ? '<span class="badge" style="background:var(--red);color:#fff">IN RITARDO</span>' : ""}</div>
+          ${items.map(x => `<div style="margin-top:6px"><b>${esc(x.merce || "—")}</b> · ${esc(x.mittente)} → ${esc(x.destinazione)} <span class="muted">· ${esc(x.numeroPedane || "1")} ped · ${esc(x.numeroColli || "?")} colli</span></div>`).join("")}
+          ${p.noteParziale ? `<div class="muted" style="margin-top:4px">Nota: ${esc(p.noteParziale)}</div>` : ""}
+          <div class="acts">
+            ${st !== "completo" ? `<button class="ok" onclick="magStatoSet('${p.id}','completo',${items.length})">✓ Scaricata</button>` : ""}
+            ${st === "attesa" ? `<button class="warn" onclick="magStatoSet('${p.id}','parziale',${items.length})">◐ Arrivo parziale</button>` : ""}
+            ${st !== "attesa" ? `<button class="del" onclick="magStatoSet('${p.id}','attesa',${items.length})">✕ Annulla</button>` : ""}
+          </div></div>`;
+      }).join("")}</div>`;
+  }).join("") : `<div class="card muted">${magDate === "oggi" && magStato === "attesa" ? "Nessuna pedana da scaricare oggi." : "Nessuna pedana trovata."}</div>`;
+}
+async function magStatoSet(id, stato, gruppo) {
+  const p = magData.find(x => x.id === id);
+  let noteParziale = "";
+  if (stato === "parziale") { noteParziale = prompt("Arrivo parziale: cosa manca? (es. arrivata 1 pedana su 3)") ; if (noteParziale === null) return; }
+  if (stato === "attesa" && !confirm(`Annullare lo stato della posizione ${p.codice}?`)) return;
+  try {
+    if (gruppo > 1) await callMag("/posizioni/stato", { method: "PATCH", json: { numeroOrdine: p.numeroOrdine, codice: p.codice, stato, noteParziale } });
+    else await callMag(`/pedane/${id}/stato`, { method: "PATCH", json: { stato, noteParziale } });
+    show(stato === "completo" ? `Posizione ${p.codice} scaricata` : stato === "parziale" ? "Arrivo parziale registrato" : "Stato annullato", true);
+    magCarica();
+  } catch (err) { show(err.message); }
+}
+async function magScaricaOrdine(num) {
+  if (!confirm(`Segnare come scaricate TUTTE le pedane dell'ordine ${num}?`)) return;
+  try {
+    const r = await callMag("/ordini/scarica", { method: "POST", json: { numeroOrdine: num } });
+    show(`Ordine ${num}: ${r.aggiornate} pedane segnate come scaricate`, true);
+    magCarica();
+  } catch (err) { show(err.message); }
+}
+
 if (location.hostname.includes("preview")) document.getElementById("previewWarn").style.display = "block";
-if (token) enter();
+caricaNomi();
+if (token) enter(); else if (magToken) enterMag();
 </script>
 </body>
 </html>
