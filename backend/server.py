@@ -385,7 +385,7 @@ async def cerca(q: str = ""):
     exact = {"$regex": f"^{re.escape(q)}$", "$options": "i"}
     docs = await db.pedane.find({"$or": [{"codice": exact}, {"numeroOrdine": exact}], **ACTIVE}).sort("codice", 1).to_list(100)
     if not docs:
-        docs = await db.pedane.find({"$or": [{"codice": rx(q)}, {"numeroOrdine": rx(q)}], **ACTIVE}).sort("codice", 1).to_list(30)
+        docs = await db.pedane.find({"$or": [{"codice": rx(q)}, {"numeroOrdine": rx(q)}], **ACTIVE}).sort("codice", 1).to_list(300)
     return [Pedana.from_mongo(d) for d in docs]
 
 

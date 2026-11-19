@@ -1,5 +1,5 @@
 import React from "react";
-import { ActivityIndicator, Pressable, Text, TextInput, TextInputProps, View, ViewStyle } from "react-native";
+import { ActivityIndicator, Platform, Pressable, Text, TextInput, TextInputProps, View, ViewStyle } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import { MaterialDesignIcons } from "@react-native-vector-icons/material-design-icons";
 
@@ -152,6 +152,7 @@ const useStyles = makeStyles((c) => ({
     fontFamily: fonts.text,
     color: c.onSurface,
     backgroundColor: c.surfaceSecondary,
+    ...(Platform.OS === "web" ? ({ outlineWidth: 0, outlineStyle: "none" } as object) : {}),
   },
   error: { color: c.error, fontSize: 12, marginTop: 4, fontFamily: fonts.textMedium },
   hint: { color: c.muted, fontSize: 12, marginTop: 4, fontFamily: fonts.text },

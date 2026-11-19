@@ -29,6 +29,9 @@ const useStyles = makeStyles((c) => ({
   flex: { flex: 1, justifyContent: "flex-end" },
   scrim: { ...({ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 } as const), backgroundColor: c.scrim },
   sheet: {
+    width: "100%",
+    maxWidth: 900,
+    alignSelf: "center",
     backgroundColor: c.surfaceSecondary,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,

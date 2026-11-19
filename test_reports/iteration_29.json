@@ -1,0 +1,36 @@
+{
+  "summary": "Frontend-only retest of the iteration 28 fixes on the website (/api/app at 1280x800) and the Expo preview (390x844). I did not modify any data. PASS: content is centred with max width 900 (landing container x=190, w=900). The ufficio-password-sheet is 900 wide (x=190). The pedana detail renders inline inside the 900 container. The tab title is 'Antolini Pedane' and html lang is 'it'. /api/app/xyz and the nested /api/app/ufficio/abc/def show the Italian not-found-screen. not-found-home-button goes back to the landing (about 2s while the chunk loads). Without a session, /api/app/ufficio/form redirects to the landing. After login with antolini2024 it opens. magazzino-search-input has outline none. Searching '2619' gives 533 pedane / 132 orders / 222 rows, up from 30. A missing static file (/api/app/_expo/.../missing-123.js) now returns 404. The Expo preview at 390x844 shows the landing and magazzino with no horizontal overflow, and the detail opens. There were no page errors. FAIL: the side background on wide screens is WHITE, not grey. The outer wrapper uses colors.surfaceSecondary, which is #FFFFFF, while the screen content uses surface #F0F4F8 (light grey). So the colours are inverted: the sides are white and the centre is grey, and on the landing everything is white.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/pedane/cerca", "issue": "A partial search is capped at 300 documents (server.py:388 to_list(300)), and the UI does not say the list was cut. '2619' shows 'Torna ai 300 risultati' while the summary says 533 pedane. This is acceptable, but consider a 'mostrati i primi 300' hint."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Root layout web wrapper", "issue": "The sides are not grey. The outer View background is colors.surfaceSecondary, which is #FFFFFF, so the area outside the 900px column is white. The landing (accesso-screen) is also white, so it shows no column at all. Other screens show a grey centre (#F0F4F8) on white sides, which is inverted. Fix: use a darker neutral for the outer wrapper (for example #E2E8F0 or a theme token darker than surface). Reference: /app/frontend/app/_layout.tsx:42", "testID": "accesso-screen", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Ufficio form / password sheet (web)", "issues": ["Field-based TextInputs (form-numero-ordine-input, the ufficio password input) still show the browser's black focus outline ('auto 1px rgb(16,16,16)'). Only magazzino-search-input got outlineStyle none. Apply the same web style in the shared Field component (src/components/ui)."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["Playwright scripts run inline via browser_automation"],
+  "action_items": [
+    "_layout.tsx:42: change the web outer wrapper background from colors.surfaceSecondary (#FFFFFF) to a grey that is darker than the screen surface (for example #E2E8F0), so the sides are visibly grey. Then re-export the web build to backend/web.",
+    "Add outlineWidth: 0 and outlineStyle: 'none' (web) to the TextInput in the shared Field component, so the form and password inputs lose the black focus ring.",
+    "Set lang='it' in frontend/app/+html.tsx. Today lang='it' exists only in the exported backend/web/index.html (it was patched by hand), so the next export will revert it to 'en'."
+  ],
+  "critical_code_review_comments": [
+    "backend/web/index.html has lang='it', but the source app/+html.tsx still has lang='en'. The source and the build output disagree.",
+    "The form.tsx guard checks the token only on the client. The form flashes briefly before router.replace. That is acceptable because the backend enforces 401."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A", "frontend": "86% (6/7 requested checks pass; the grey side background fails)"},
+  "seed_data_creation": "None. I made no data changes and saved no orders.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "The website is the Expo web export served from backend/web at /api/app (re-export needed after source changes). Office password: antolini2024. The magazzino search for '2619' returns 300 docs (cap). Verify that the outer wrapper colour is grey at 1280px, using elementFromPoint(60,700) background.",
+  "rca_of_issue": "Grey sides: _layout.tsx uses colors.surfaceSecondary for the outer web wrapper, but in the theme surfaceSecondary = #FFFFFF and surface = #F0F4F8, so the wrapper is white."
+}

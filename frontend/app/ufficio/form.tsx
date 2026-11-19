@@ -7,7 +7,8 @@ import { KeyboardAwareScrollView, KeyboardStickyView } from "react-native-keyboa
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialDesignIcons } from "@react-native-vector-icons/material-design-icons";
 
-import { api, ImportResult, isTrasbordo, OrdineForm, Pedana, PedanaRow, TRASPORTATORE_DEFAULT } from "@/src/api";
+import { api, ImportResult, isTrasbordo, OrdineForm, Pedana, PedanaRow, TOKEN_KEY, TRASPORTATORE_DEFAULT } from "@/src/api";
+import { storage } from "@/src/utils/storage";
 import { Sheet } from "@/src/components/Sheet";
 import { useToast } from "@/src/components/Toast";
 import { Button, Field, IconButton } from "@/src/components/ui";
@@ -63,6 +64,13 @@ export default function OrdineFormScreen() {
   const toast = useToast();
   const { colors } = useTheme();
   const styles = useStyles();
+
+  useEffect(() => {
+    // Office-only screen: without a session go back to the landing
+    storage.secureGet(TOKEN_KEY, null).then((t) => {
+      if (!t) router.replace("/");
+    });
+  }, [router]);
 
   useEffect(() => {
     if (!editingId) return;

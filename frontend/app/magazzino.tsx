@@ -344,7 +344,7 @@ export default function Magazzino() {
               </View>
             )}
             <Text style={styles.count} testID="magazzino-results-count">
-              {q.trim() ? `${totPedane(filtered)} pedane trovate` : filtro === "tutte" && dataFiltro === "tutte" ? `Tutta la merce registrata · ${totPedane(filtered)} pedane` : `${totPedane(filtered)} pedane · ${mergePositions(filtered).length} posizioni`} · {groupByOrder(filtered).length} ordini
+              {q.trim() ? `${totPedane(filtered)} pedane trovate${results.length >= 300 ? " (primi 300 risultati: scrivi di più per restringere)" : ""}` : filtro === "tutte" && dataFiltro === "tutte" ? `Tutta la merce registrata · ${totPedane(filtered)} pedane` : `${totPedane(filtered)} pedane · ${mergePositions(filtered).length} posizioni`} · {groupByOrder(filtered).length} ordini
             </Text>
             {groupByOrder(filtered).map((g, gi) => {
               const all = results.filter((p) => (p.numeroOrdine || "—") === g.numero);
@@ -619,7 +619,7 @@ const useStyles = makeStyles((c) => ({
     minHeight: 68,
     backgroundColor: c.surfaceSecondary,
   },
-  input: { flex: 1, minWidth: 0, fontFamily: fonts.display, fontSize: 26, color: c.onSurface, paddingVertical: 8, ...({ outlineWidth: 0 } as object) },
+  input: { flex: 1, minWidth: 0, fontFamily: fonts.display, fontSize: 26, color: c.onSurface, paddingVertical: 8, ...({ outlineWidth: 0, outlineStyle: "none" } as object) },
   clear: { padding: 4 },
   content: { padding: 16 },
   loader: { marginTop: 48 },

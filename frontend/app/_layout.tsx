@@ -2,7 +2,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import { useFonts } from "expo-font";
 import { StatusBar } from "expo-status-bar";
-import { LogBox, View } from "react-native";
+import { LogBox, Platform, View } from "react-native";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
@@ -38,7 +38,12 @@ export default function RootLayout() {
           <KeyboardProvider>
             <ToastProvider>
               <StatusBar style="dark" />
-              <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.surface } }} />
+              {/* Web on wide screens: keep the phone-like layout centred and readable */}
+              <View style={Platform.OS === "web" ? { flex: 1, backgroundColor: colors.border } : { flex: 1 }}>
+                <View style={Platform.OS === "web" ? { flex: 1, width: "100%", maxWidth: 900, alignSelf: "center" } : { flex: 1 }}>
+                  <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.surface } }} />
+                </View>
+              </View>
             </ToastProvider>
           </KeyboardProvider>
         </SafeAreaProvider>
