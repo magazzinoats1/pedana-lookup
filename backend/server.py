@@ -1,5 +1,5 @@
 from fastapi import FastAPI, APIRouter, Depends, Header, HTTPException, UploadFile, File, Query
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -847,13 +847,25 @@ async def root():
     return {"message": "Gestione Logistica API"}
 
 
-SITO_HTML = (ROOT_DIR / "sito.html")
+WEB_DIR = (ROOT_DIR / "web").resolve()
 
 
-@api.get("/sito", response_class=HTMLResponse, include_in_schema=False)
+@api.get("/sito", include_in_schema=False)
 async def sito():
-    # Browser site for the office: register orders from PDF + live arrivals (same data as the app)
-    return HTMLResponse(SITO_HTML.read_text(encoding="utf-8"))
+    # The website is now the app itself (same screens and workflow)
+    return RedirectResponse("/api/app/")
+
+
+@api.get("/app", include_in_schema=False)
+@api.get("/app/{path:path}", include_in_schema=False)
+async def web_app(path: str = ""):
+    # Web export of the Expo app; unknown paths fall back to index.html (single-page routing)
+    f = (WEB_DIR / path).resolve()
+    if path and f.is_file() and WEB_DIR in f.parents:
+        return FileResponse(f)
+    if "." in path.rsplit("/", 1)[-1]:
+        raise HTTPException(status_code=404, detail="File non trovato")
+    return FileResponse(WEB_DIR / "index.html", headers={"Cache-Control": "no-cache"})
 
 
 @api.get("/privacy", response_class=HTMLResponse, include_in_schema=False)

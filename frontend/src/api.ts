@@ -1,6 +1,10 @@
+import { Platform } from "react-native";
 import { storage } from "@/src/utils/storage";
 
-const BASE = `${process.env.EXPO_PUBLIC_BACKEND_URL}/api`;
+// When the app is served as a website by the backend itself (/api/app), talk to that same server
+const SELF_HOSTED = Platform.OS === "web" && typeof window !== "undefined" && window.location.pathname.startsWith("/api/app");
+export const BACKEND_ORIGIN = SELF_HOSTED ? window.location.origin : process.env.EXPO_PUBLIC_BACKEND_URL;
+const BASE = `${BACKEND_ORIGIN}/api`;
 export const TOKEN_KEY = "ufficio_session_token";
 export const MAG_TOKEN_KEY = "magazziniere_session_token";
 

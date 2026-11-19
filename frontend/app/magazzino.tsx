@@ -167,7 +167,7 @@ export default function Magazzino() {
     <View style={styles.root}>
       <AppHeader
         subtitle={`${coop ? `Coop: ${coop} — ` : ""}Accesso Magazzino`}
-        right={<IconButton icon="logout" tone="onBrand" onPress={() => router.replace("/")} testID="magazzino-esci-button" />}
+        right={<IconButton icon="logout" tone="onBrand" onPress={() => (router.canGoBack() ? router.back() : router.replace("/"))} testID="magazzino-esci-button" />}
       />
       <View style={styles.searchCard}>
         <View style={styles.titleRow}>

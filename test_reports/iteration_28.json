@@ -1,0 +1,43 @@
+{
+  "summary": "Frontend-only test of the Expo web export served by FastAPI at /api/app. Tested at 1280x800 and 390x844. All requested flows PASS. /api/sito returns 307 to /api/app/, and the landing shows accesso-ufficio-button, accesso-magazzino-button and accesso-privacy-link. The app fonts are loaded and applied (BarlowCondensed and IBMPlexSans faces, plus MaterialDesignIcons), and the logo renders. API calls go to the same origin (window.location.origin). Ufficio login with antolini2024 works on both sizes, by button and by Enter, and shows '695 pedane trovate'. Nuovo Ordine opens /api/app/ufficio/form. The PDF import through the file chooser filled numero 25024298, trasportatore 'Antolini s.r.l.', agenzia 'KÖLLA GmbH & Co. KG', data 19/11/2026, note, and 9 pallet rows (first row 2619-021435 / FRUTTA ITALIA V. / Josef Ochs GmbH - St Ingbert). I did NOT save the order. Reloading deep links works (SPA fallback) for /api/app/ufficio/form, /api/app/ufficio/riepilogo (with a session) and /api/app/magazzino. Without a session, /ufficio and /ufficio/riepilogo redirect to the landing. On the magazzino page, the list loads with Oggi 3 / Domani 0 / Tutte 1392 (Tutte gives 209 groups / 478 rows). Searching '2619' returns 30 rows, '57 pedane trovate · 16 ordini'. The pedana detail card opens on phone and desktop. Browser back and forward work. The privacy link opens /api/privacy in a new tab. The network log showed no 4xx/5xx and no console errors on any /api/app page. The regular Expo preview at / still renders the landing.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/app/{path}", "issue": "Missing static files (e.g. /api/app/_expo/static/js/web/missing-123.js) return 200 text/html (index.html) instead of 404. After a re-export, an open tab that requests an old hashed chunk gets HTML and fails with a JS parse error instead of a clean 404. Suggest: return 404 when the path has a file extension or starts with _expo/ or assets/. Hashed assets could also get a long Cache-Control. Reference: /app/backend/server.py:861-866"}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Ufficio form route guard", "issue": "/api/app/ufficio/form opened directly without a session renders the full form instead of redirecting to the landing, as /ufficio and /ufficio/riepilogo do. The backend rejects the request with 401 (the import-pdf call returned 401 without auth), so this is a UX gap only. The same code runs in the native app. Reference: /app/frontend/app/ufficio/form.tsx", "testID": "form-import-pdf-button", "priority": "LOW"},
+      {"component": "Unmatched route", "issue": "An unknown path such as /api/app/nonexistent-route shows the default English Expo 'Unmatched Route' screen (black, with Sitemap link). The URL it shows drops the /api/app prefix. Suggest adding app/+not-found.tsx in Italian with a button back to the landing.", "testID": "expo-router-unmatched", "priority": "LOW"},
+      {"component": "Stack after Esci", "issue": "magazzino-esci-button calls router.replace('/'). When the landing is already below it in the stack, a second landing is stacked, giving 2 accesso-ufficio-button in the DOM. Browser back from it then returns to another landing. Suggest router.dismissAll() or canGoBack() ? back() : replace('/'). Reference: /app/frontend/app/magazzino.tsx:170", "testID": "magazzino-esci-button", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Magazzino (web)", "issues": ["The browser's default black focus outline is drawn inside the magazzino-search-input box on web, because the input already has a blue focused border. Add outlineStyle: 'none' on web for TextInput (Field components too)."]},
+      {"screen": "index.html / +html.tsx", "issues": ["The page title is 'frontend' and <html lang='en'>. For an Italian website, set lang='it' and a <title> such as 'Gestione Logistica · Antolini' in app/+html.tsx."]},
+      {"screen": "Desktop 1280px", "issues": ["Optional: Sheet (ufficio-password-sheet) and the lists stretch to the full 1280px width. This is consistent with 'identical to app', but a maxWidth (~720) centered container would read better on desktop."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/tmp/transport.pdf (downloaded test PDF)", "Playwright scripts run inline via browser_automation"],
+  "action_items": [
+    "Add a repeatable build step (e.g. scripts/build_web.sh: WEB_EXPORT=1 npx expo export -p web, then copy to backend/web). Right now backend/web is a static snapshot (in sync as of 2026-11-19 00:51). Any later change to frontend/app or src will NOT reach /api/app until it is re-exported.",
+    "server.py web_app: return 404 for missing files that have an extension or sit under _expo/ or assets/, instead of falling back to index.html.",
+    "Add an auth guard on /ufficio/form when there is no ufficio token (redirect to '/'), matching /ufficio.",
+    "Add app/+not-found.tsx (Italian), set <html lang='it'> and a proper <title> in +html.tsx, and add outlineStyle:'none' for web TextInputs.",
+    "DATA: pedane 2619-021560 (ord. 25024335) and 2619-021511 (ord. 25024331) are marked 'completo' by operator 'TEST_SITO_MAG' (from 2026-11-17). They look like real orders unloaded by an earlier test run. Verify and reset their stato if they were not really unloaded. I did not make this change."
+  ],
+  "critical_code_review_comments": [
+    "web_app path traversal is safe: resolve() plus the 'WEB_DIR in f.parents' check. /api/app/../server.py gives 404, and an encoded ..%2F falls back to index.html.",
+    "api.ts SELF_HOSTED detection is evaluated once at module load. This is fine because the baseUrl is fixed for the export.",
+    "GET /pedane/cerca partial match is capped at 30 rows with no 'more results' hint (search '2619' shows 'Torna ai 30 risultati'). The cap is acceptable but may confuse users."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend only)", "frontend": "100% of requested flows (3 low-priority bugs, 3 minor design notes)"},
+  "seed_data_creation": "None. The PDF import was not saved, and no pedane were marked or changed.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Site = Expo web export at backend/web served via /api/app (baseUrl from app.config.js WEB_EXPORT=1). The test PDF parses to order 25024298 with 9 rows. Server date is 2026-11-19. On magazzino: Oggi 3 pedane, Domani 0, Tutte 1392. Office password: antolini2024.",
+  "rca_of_issue": ""
+}

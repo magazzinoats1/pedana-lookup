@@ -6,7 +6,7 @@ import Animated, { FadeIn, FadeInDown, FadeOut, ZoomIn } from "react-native-rean
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialDesignIcons } from "@react-native-vector-icons/material-design-icons";
 
-import { api, TOKEN_KEY } from "@/src/api";
+import { api, BACKEND_ORIGIN, TOKEN_KEY } from "@/src/api";
 import { Sheet } from "@/src/components/Sheet";
 import { Button, Field } from "@/src/components/ui";
 import { fonts, makeStyles, useTheme } from "@/src/theme";
@@ -121,7 +121,7 @@ export default function Accesso() {
         </Animated.View>
         <Pressable
           testID="accesso-privacy-link"
-          onPress={() => Linking.openURL(`${process.env.EXPO_PUBLIC_BACKEND_URL}/api/privacy`)}
+          onPress={() => Linking.openURL(`${BACKEND_ORIGIN}/api/privacy`)}
           hitSlop={12}
           style={styles.privacy}
         >
