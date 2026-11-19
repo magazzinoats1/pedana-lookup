@@ -367,6 +367,13 @@ def rx(q: str):
     return {"$regex": re.escape(q), "$options": "i"}
 
 
+def rx_codice(q: str, exact: bool = False):
+    """Position/order search where dashes are optional: '2619021560' matches '2619-021560'."""
+    chars = [re.escape(ch) for ch in q.replace("-", "").replace(" ", "")]
+    body = "-?".join(chars)
+    return {"$regex": f"^{body}$" if exact else body, "$options": "i"}
+
+
 @api.get("/pedane", response_model=List[Pedana])
 async def list_pedane(q: str = "", _=Depends(require_ufficio)):
     query = {}
@@ -382,10 +389,10 @@ async def cerca(q: str = ""):
     q = q.strip()
     if not q:
         return []
-    exact = {"$regex": f"^{re.escape(q)}$", "$options": "i"}
+    exact = rx_codice(q, exact=True)
     docs = await db.pedane.find({"$or": [{"codice": exact}, {"numeroOrdine": exact}], **ACTIVE}).sort("codice", 1).to_list(100)
     if not docs:
-        docs = await db.pedane.find({"$or": [{"codice": rx(q)}, {"numeroOrdine": rx(q)}], **ACTIVE}).sort("codice", 1).to_list(300)
+        docs = await db.pedane.find({"$or": [{"codice": rx_codice(q)}, {"numeroOrdine": rx_codice(q)}], **ACTIVE}).sort("codice", 1).to_list(300)
     return [Pedana.from_mongo(d) for d in docs]
 
 
@@ -860,6 +867,9 @@ async def sito():
 @api.get("/app/{path:path}", include_in_schema=False)
 async def web_app(path: str = ""):
     # Web export of the Expo app; unknown paths fall back to index.html (single-page routing)
+    # Deploys skip "node_modules" folders: export moves those assets to assets/vendor (old cached bundles still ask the old path)
+    if path.startswith("assets/node_modules/"):
+        path = "assets/vendor/" + path[len("assets/node_modules/"):]
     f = (WEB_DIR / path).resolve()
     if path and f.is_file() and WEB_DIR in f.parents:
         return FileResponse(f)

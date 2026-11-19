@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, AppState, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, AppState, Platform, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -199,6 +199,9 @@ export default function Magazzino() {
             autoFocus
             autoCorrect={false}
             autoCapitalize="characters"
+            // Positions and order numbers are digits: open the number keyboard (dashes are optional in search)
+            keyboardType={Platform.OS === "ios" ? "numbers-and-punctuation" : "numeric"}
+            inputMode="numeric"
             returnKeyType="search"
             style={styles.input}
           />

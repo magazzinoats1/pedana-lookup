@@ -29,6 +29,11 @@ const isoToIt = (s: string) => {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || "");
   return m ? `${m[3]}/${m[2]}/${m[1]}` : "";
 };
+// Number keyboard has no dash on Android: typing digits only gives "2619-019320" automatically
+const formatPosizione = (t: string) => {
+  if (!/^\d+$/.test(t)) return t;
+  return t.length > 4 ? `${t.slice(0, 4)}-${t.slice(4)}` : t;
+};
 const itToIso = (s: string) => {
   const m = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/.exec(s.trim());
   if (!m) return null;
@@ -355,12 +360,14 @@ export default function OrdineFormScreen() {
                 <Field
                   label="Posizione *"
                   value={r.codice}
-                  onChangeText={(t) => setRow(i, "codice", t)}
+                  onChangeText={(t) => setRow(i, "codice", formatPosizione(t))}
                   placeholder="es. 2619-019320"
                   error={re?.codice}
                   testID={`form-pedana-codice-input-${i}`}
                   autoCapitalize="characters"
                   autoCorrect={false}
+                  keyboardType={Platform.OS === "ios" ? "numbers-and-punctuation" : "numeric"}
+                  inputMode="numeric"
                   style={styles.codeInput}
                 />
                 <Field label="Mittente *" value={r.mittente} onChangeText={(t) => setRow(i, "mittente", t)} placeholder="es. Orchidea, Bertoli Fruit…" error={re?.mittente} testID={`form-pedana-mittente-input-${i}`} />
