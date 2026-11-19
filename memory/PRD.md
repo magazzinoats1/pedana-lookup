@@ -57,5 +57,5 @@ User uploaded a KÖLLA transport-order PDF and a reference web app (GestioneLogi
 ## Update: Magazzino front page only today
 - Default date filter "Oggi" (search switches to Tutte, clearing returns to Oggi). Banners/chips/counts use real pallet sums (numeroPedane; empty=1, 0=0) + colli sums. Sito Arrivi shows pedane+colli.
 - Sito: aggiunto Accesso Magazzino (nome+PIN): ricerca, filtri Oggi/Domani/Tutte + stato, ritardi, scarico posizione/parziale/annulla, scarica ordine intero, auto-refresh 15s. /api/privacy pagina informativa + link in app.
-- SITO = web export of the Expo app served by backend at /api/app (/api/sito redirects there). After ANY frontend change re-run: cd /app/frontend && WEB_EXPORT=1 npx expo export --platform web --output-dir /app/backend/web  (app.config.js sets baseUrl /api/app only when WEB_EXPORT=1). api.ts uses window.location.origin when served under /api/app.
+- SITO = web export of Expo app served at /api/app. After ANY frontend change run /app/frontend/scripts/export-web.sh (moves assets/node_modules -> assets/vendor because deploy skips node_modules; sets lang it).
 - Post-export step: sed -i "s/<html lang=\"en\"/<html lang=\"it\"/" /app/backend/web/index.html. App name now "Antolini Pedane". Added +not-found.tsx, form auth guard, web max-width 900, search limit 300.
